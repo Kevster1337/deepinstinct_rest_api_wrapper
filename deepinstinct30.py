@@ -33,7 +33,6 @@ import requests, json, datetime, pandas, re, ipaddress, time, os
 #If that doesn't fix the problem I recommend to search Google for the error
 #that you are getting.
 
-
 # Export Device List to disk in Excel format
 def export_devices(include_deactivated=False):
     #get the devices from server
@@ -1127,3 +1126,127 @@ def request_malware_sample(event_id):
     else:
         print('ERROR: Unexpected return code', response.status_code, 'on POST to', request_url, 'with headers', headers)
         return False
+
+def isolate_from_network(devices, release_from_isolation=False, input_is_hostnames=True):
+
+    if input_is_hostnames:
+        device_ids = get_device_ids(search_list=devices)
+    else:
+        device_ids = devices
+
+    if not remove_from_isolation:
+        request_url = f'https://{fqdn}/api/v1/devices/actions/isolate-from-network'
+    else:
+        request_url = f'https://{fqdn}/api/v1/devices/actions/release-from-isolation'
+
+    headers = {'accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': key}
+    payload = {'ids': device_ids}
+
+    response = requests.post(request_url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        if remove_from_isolation:
+            print('INFO: Removed', len(device_ids), 'devices from network isolation')
+        else:
+            print('INFO: Network isolated', len(device_ids), 'devices')
+        return True
+    else:
+        print('ERROR: Unexpected return code', response.status_code,
+                'on POST to', request_url, 'with payload', payload)
+        return False
+
+
+def remove_from_isolation(device_ids, input_is_hostnames=True):
+    return isolate_from_network(device_ids=device_ids, release_from_isolation=True, input_is_hostnames=input_is_hostnames)
+
+
+def add_hashes_to_deny_list(hash_list, policy_id=0, all_policies=False, platforms=['WINDOWS','MAC','LINUX','NETWORK_AGENTLESS']):
+
+    policies = get_policies(include_policy_data=False)
+    policy_id_list = []
+    for policy in policies:
+        if policy['os'] in platforms:
+            if all_policies or policy['id'] == policy_id:
+                policy_id_list.append(policy['id'])
+
+    payload = {'items:': []}
+    for hash in hash_list:
+        payload_entry = {'item': hash, 'comment': 'Deny Listed by di.add_hashes_to_deny_list'}
+        payload['items'].append(payload_entry)
+
+    headers = {'accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': key}
+
+    error_count = 0
+    for policy_id in policy_id_list:
+        request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/deny-list/hashes'
+        response = requests.post(request_url, headers=headers, json=payload)
+        if response.status_code == 204:
+            print('INFO: Successfully added', len(payload['items']), 'hashes to the deny list for policy', policy_id)
+        else:
+            print('ERROR: Unexpected return code', response.status_code, 'on POST to', request_url)
+            error_count += 1
+    if error_count > 0:
+        return False
+    else:
+        return True
+
+# Method to copy policies from one MSP to another on a multi-tenancy server
+def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['WINDOWS', 'MAC'], allow_deny_and_exclusion_list_types = ['allow-list/hashes', 'allow-list/paths', 'allow-list/certificates', 'allow-list/process_paths', 'allow-list/scripts', 'deny-list/hashes', 'exclusion-list/folder_path', 'exclusion-list/process_path'] ):
+
+    #get policies from each of the MSPs
+    source_msp_policies = get_policies(include_policy_data=True, keep_data_encapsulated=True, include_allow_deny_lists=True, msp_id=source_msp_id)
+    destination_msp_policies = get_policies(include_policy_data=True, keep_data_encapsulated=True, include_allow_deny_lists=True, msp_id=destination_msp_id)
+
+    #build list of policy names in destination MSP (so as to avoid collissions)
+    destination_msp_policy_names = []
+    for policy in destination_msp_policies:
+        destination_msp_policy_names.append(policy['name'])
+
+    #build a dictionary of default policy IDs in destination MSP (used for policy creation)
+    destination_default_policy_ids = {}
+    for policy in destination_msp_policies:
+        if policy['is_default_policy']:
+            destination_default_policy_ids[policy['os']] = policy['id']
+
+    #build list of policies to migrate
+    policies_to_migrate = []
+    for source_msp_policy in source_msp_policies:
+        if source_msp_policy['os'] in platforms_to_migrate:
+            policies_to_migrate.append(source_msp_policy)
+
+    #Migrate the policies
+    for policy in policies_to_migrate:
+
+        #first step is to create the base policy, which we'll base on the platform-specific default policy
+        if policy['name'] in destination_msp_policy_names:
+            for destination_msp_policy in destination_msp_policies:
+                if policy['name'] == destination_msp_policy['name']:
+                    new_policy = destination_msp_policy
+        else:
+            new_policy = create_policy(policy['name'], destination_default_policy_ids[policy['os']], quiet_mode=True, )
+
+        #next step is to overwrite the policy data on the newly-create policy with data from source policy
+        new_policy_id = new_policy['id']
+        request_url = f'https://{fqdn}/api/v1/policies/{new_policy_id}/data'
+        headers = {'accept': 'application/json', 'Authorization': key}
+        payload = {'data': policy['data']}
+        response = requests.put(request_url, json=payload, headers=headers)
+        if response.status_code != 204:
+            print('ERROR: Unexpected response', response.status_code, 'on PUT to', request_url)
+
+        #last step is to migrate the associated allow list, deny list, and exclusion lists for the policy
+        headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
+        for list_type in allow_deny_and_exclusion_list_types:
+            if list_type in policy['allow_deny_and_exclusion_lists']:
+                if len(policy['allow_deny_and_exclusion_lists'][list_type]['items']) > 0:
+                    payload = policy['allow_deny_and_exclusion_lists'][list_type]
+                    request_url = f'https://{fqdn}/api/v1/policies/{new_policy_id}/{list_type}'
+                    response = requests.post(request_url, headers=headers, json=payload)
+                    if response.status_code != 204:
+                        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
+
+    print('INFO: Done migrating', len(policies_to_migrate), 'policies from MSP', source_msp_id , 'to MSP', destination_msp_id)
