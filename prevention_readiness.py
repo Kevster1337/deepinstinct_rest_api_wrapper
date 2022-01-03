@@ -39,23 +39,42 @@
 import deepinstinct30 as di, json, datetime, pandas
 from dateutil import parser
 
-#Criteria for determining yes/no on whether an endpoint is ready for prevention
-min_days_since_deployment = '10'
-max_days_since_last_contact = '3'
-max_weekly_event_rate = '2'
+#prompt for config
+di.fqdn = input('Enter FQDN of DI Server, or press enter to accept default [di-service.customers.deepinstinctweb.com]: ')
+if di.fqdn == '':
+    di.fqdn = 'di-service.customers.deepinstinctweb.com'
 
-#server config
-di.fqdn = '' #optionally hardcode server name here
-di.key = '' #optionally hardcode API key here
-minimum_event_id = '' #optionally hardcode a minimum event id here
+di.key = input('Enter API Key for DI Server: ')
 
-#prompt for any missing config
-while di.fqdn == '':
-    di.fqdn = input('FQDN of DI Server: ')
-while di.key == '':
-    di.key = input('API Key: ')
-while minimum_event_id == '':
-    minimum_event_id = input('Minimum event id (use 0 to get all events): ')
+minimum_event_id = input('Enter minimum_event_id as an integer, or press enter to accept default [0]: ')
+if minimum_event_id == '':
+    minimum_event_id = 0
+
+min_days_since_deployment = input('Enter min_days_since_deployment as an integer, or press enter to accept default [10]: ')
+if min_days_since_deployment == '':
+    min_days_since_deployment = 10
+
+max_days_since_last_contact = input('Enter mmax_days_since_last_contact as an integer, or press enter to accept default [3]: ')
+if max_days_since_last_contact == '':
+    max_days_since_last_contact = 3
+
+max_weekly_event_rate = input('Enter max_weekly_event_rate as an integer, or press enter to accept default [2]: ')
+if max_weekly_event_rate == '':
+    max_weekly_event_rate = 2
+
+minimum_event_id = input('Enter minimum_event_id as an integer, or press enter to accept default [0]: ')
+if minimum_event_id == '':
+    minimum_event_id = 0
+
+user_response = input('Include closed events? Enter YES or NO, or press enter to accept default [NO]: ')
+if user_response.lower() == 'yes':
+    include_closed_events = True
+else:
+    include_closed_events = False
+
+user_response = input('Enable debug mode? Enter YES or NO, or press enter to accept default [NO]: ')
+if user_response.lower() == 'yes':
+    di.debug_mode = True
 
 #get the data from DI server
 print('INFO: Gathering data')
@@ -65,7 +84,7 @@ print('INFO: Calling get_policies')
 policies = di.get_policies(include_policy_data=True)
 print('INFO: Calling get_groups')
 groups = di.get_groups(exclude_default_groups=False)
-print('INFO: Calling get_events using minimum_event_id', minimum_event_id)
+print('INFO: Calling get_events')
 all_events = di.get_events(minimum_event_id=minimum_event_id)
 print('INFO:', len(all_events), 'events were returned.')
 print('INFO: Beginning filtering events')
@@ -75,37 +94,38 @@ included_events = []
 excluded_events = []
 
 for event in all_events:
+    if event['status'] == 'OPEN' or include_closed_events:
 
-    if event['type'] in ['STATIC_ANALYSIS']:
-        if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
+        if event['type'] in ['STATIC_ANALYSIS']:
+            if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
+                included_events.append(event)
+
+            # TODO: You can add more filters here for patterns of activity you have
+            # either confirmed as a True Positive -or- you have confirmed as a
+            # False Positive and added the appropriate allow list. Some examples
+            # are below (commented out). You need to remove/comment out the above
+            # code block and replace it wabuild *nested* if statements with a single
+            # 'append' statement at the end
+
+            #if event['type'] in ['STATIC_ANALYSIS']:
+                #if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
+                    #if event['file_hash'] not in ['alpha', 'bravo']:
+                        #if event['path'][0:10] not in ['c:\\echo\\foxtrot\\']:
+                            #if event['path'][0:28] not in ['/Users/paulinejolly/Library/']:
+                                #if event['path'][0:22] not in ['/Users/workspace/berk/']:
+                                    #included_events.append(event)
+
+        #TODO: You might also consider removing some/many event types below, which
+        #means they will always be excluded from analysis. This is useful if, for
+        #example, you are evaluating Prevention Readiness only for specific DI
+        #policy feature(s).
+        #Alternately, you might create additional code based on the example
+        #above (for Static Analysis) which excludes Behavioral events which you
+        #have confirmed to be False Positives (and handled via Allow List) or True
+        #Positives.
+
+        elif event['type'] in ['RANSOMWARE_FILE_ENCRYPTION', 'REMOTE_CODE_INJECTION_EXECUTION', 'KNOWN_SHELLCODE_PAYLOADS', 'ARBITRARY_SHELLCODE', 'REFLECTIVE_DLL', 'REFLECTIVE_DOTNET', 'AMSI_BYPASS', 'DIRECT_SYSTEMCALLS', 'CREDENTIAL_DUMP', 'MALICIOUS_POWERSHELL_COMMAND_EXECUTION']:
             included_events.append(event)
-
-        # TODO: You can add more filters here for patterns of activity you have
-        # either confirmed as a True Positive -or- you have confirmed as a
-        # False Positive and added the appropriate allow list. Some examples
-        # are below (commented out). You need to remove/comment out the above
-        # code block and replace it wabuild *nested* if statements with a single
-        # 'append' statement at the end
-
-        #if event['type'] in ['STATIC_ANALYSIS']:
-            #if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
-                #if event['file_hash'] not in ['alpha', 'bravo']:
-                    #if event['path'][0:10] not in ['c:\\echo\\foxtrot\\']:
-                        #if event['path'][0:28] not in ['/Users/paulinejolly/Library/']:
-                            #if event['path'][0:22] not in ['/Users/workspace/berk/']:
-                                #included_events.append(event)
-
-    #TODO: You might also consider removing some/many event types below, which
-    #means they will always be excluded from analysis. This is useful if, for
-    #example, you are evaluating Prevention Readiness only for specific DI
-    #policy feature(s).
-    #Alternately, you might create additional code based on the example
-    #above (for Static Analysis) which excludes Behavioral events which you
-    #have confirmed to be False Positives (and handled via Allow List) or True
-    #Positives.
-
-    elif event['type'] in ['RANSOMWARE_FILE_ENCRYPTION', 'REMOTE_CODE_INJECTION_EXECUTION', 'KNOWN_SHELLCODE_PAYLOADS', 'ARBITRARY_SHELLCODE', 'REFLECTIVE_DLL', 'REFLECTIVE_DOTNET', 'AMSI_BYPASS', 'DIRECT_SYSTEMCALLS', 'CREDENTIAL_DUMP', 'MALICIOUS_POWERSHELL_COMMAND_EXECUTION']:
-        included_events.append(event)
 
     #all events that didn't match any of the inclusion parameters above go here
     else:
@@ -204,65 +224,6 @@ for group in groups:
         groups_with_devices_ready_for_prevention.append(group)
 print('INFO: Done with calculations')
 
-#print summary data
-print()
-print('-----')
-print('SUMMARY OF FINDINGS:')
-print('-----')
-print(len(devices), 'total devices with an activated license on', di.fqdn)
-print(len(devices_already_in_prevention), 'of those are already in prevention')
-print(len(devices_not_ready_for_prevention), 'are not yet ready to move to prevention based on the criteria provided')
-print(len(devices_ready_for_prevention), 'are ready to move to prevention')
-print()
-print('-----')
-print('CRITERIA USED IN ABOVE CALCULATIONS:')
-print('-----')
-print('min_days_since_deployment:', min_days_since_deployment)
-print('max_days_since_last_contact:', max_days_since_last_contact)
-print('max_weekly_event_rate:', max_weekly_event_rate)
-print()
-print('The', len(devices_ready_for_prevention), 'devices ready to move to prevention are currently in the following', len(groups_with_devices_ready_for_prevention), 'Device Group(s):')
-print(json.dumps(groups_with_devices_ready_for_prevention, indent=4))
-print()
-
-execute_moves_now = ''
-
-if len(devices_ready_for_prevention) == 0:
-    execute_moves_now = False
-else:
-    execute_moves_now = ''
-
-while execute_moves_now not in (True, False):
-    response = input('Do you want to chose groups and move some or all devices to prevention mode now [YES | NO]? ')
-    if response.lower() == 'yes':
-        execute_moves_now = True
-    elif response.lower() == 'no':
-        execute_moves_now = False
-
-if execute_moves_now:
-    #for each group with 1 or more devices ready for prevention, calculate valid new groups and prompt user to select one
-    for old_group in groups_with_devices_ready_for_prevention:
-        print('INFO: Calcuating possible destination groups for devices currently in Device Group', old_group['id'], old_group['name'])
-        destination_group_options = []
-        for group in groups:
-            if group['msp_id'] == old_group['msp_id']:
-                if group['os'] == old_group['os']:
-                    if not group['is_default_group']:
-                        if group['id'] != old_group['id']:
-                            if group['prevention_mode']:
-                                destination_group_options.append(group)
-        print('')
-        print('The', old_group['devices_ready_for_prevention'], 'devices in',
-                old_group['os'], old_group['id'], old_group['name'],
-                'can be moved to one of the following groups:')
-        print(json.dumps(destination_group_options, indent=4))
-        print()
-        old_group['destination_group_id'] = input('What is the ID of the group you want to move them to? ')
-
-    print()
-    print('INFO: Done collecting data and selecting destination groups')
-
-print()
 print('INFO: Converting data to Pandas dataframes to prepare to export to disk')
 event_counts_df = pandas.DataFrame((event_counts.items()))
 devices_df = pandas.DataFrame(devices)
@@ -293,6 +254,67 @@ with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
     excluded_events_df.to_excel(writer, sheet_name='excluded_events', index=False)
 
 print('INFO: Done writing data to disk')
+
+
+#print summary data
+print()
+print('-----')
+print('SUMMARY OF FINDINGS:')
+print('-----')
+print(len(devices), 'total devices with an activated license on', di.fqdn)
+print(len(devices_already_in_prevention), 'of those are already in prevention')
+print(len(devices_not_ready_for_prevention), 'are not yet ready to move to prevention based on the criteria provided')
+print(len(devices_ready_for_prevention), 'are ready to move to prevention')
+print()
+print('-----')
+print('CRITERIA USED IN ABOVE CALCULATIONS:')
+print('-----')
+print('min_days_since_deployment:', min_days_since_deployment)
+print('max_days_since_last_contact:', max_days_since_last_contact)
+print('max_weekly_event_rate:', max_weekly_event_rate)
+print('minimum_event_id:', minimum_event_id)
+print('include_closed_events:', include_closed_events)
+print()
+print('The', len(devices_ready_for_prevention), 'devices ready to move to prevention are currently in the following', len(groups_with_devices_ready_for_prevention), 'Device Group(s):')
+print(json.dumps(groups_with_devices_ready_for_prevention, indent=4))
+print()
+
+execute_moves_now = ''
+
+if len(devices_ready_for_prevention) == 0:
+    execute_moves_now = False
+else:
+    execute_moves_now = ''
+
+while execute_moves_now not in (True, False):
+    response = input('Do you want to choose groups and move some or all devices to prevention mode now [YES | NO]? ')
+    if response.lower() == 'yes':
+        execute_moves_now = True
+    elif response.lower() == 'no':
+        execute_moves_now = False
+
+if execute_moves_now:
+    #for each group with 1 or more devices ready for prevention, calculate valid new groups and prompt user to select one
+    for old_group in groups_with_devices_ready_for_prevention:
+        print('INFO: Calcuating possible destination groups for devices currently in Device Group', old_group['id'], old_group['name'])
+        destination_group_options = []
+        for group in groups:
+            if group['msp_id'] == old_group['msp_id']:
+                if group['os'] == old_group['os']:
+                    if not group['is_default_group']:
+                        if group['id'] != old_group['id']:
+                            if group['prevention_mode']:
+                                destination_group_options.append(group)
+        print('')
+        print('The', old_group['devices_ready_for_prevention'], 'devices in',
+                old_group['os'], old_group['id'], old_group['name'],
+                'can be moved to one of the following groups:')
+        print(json.dumps(destination_group_options, indent=4))
+        print()
+        old_group['destination_group_id'] = input('What is the ID of the group you want to move them to? ')
+
+    print()
+    print('INFO: Done collecting data and selecting destination groups')
 
 print()
 

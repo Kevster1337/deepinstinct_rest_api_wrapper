@@ -71,10 +71,14 @@ print('INFO:', len(all_events), 'total visible events on server')
 filtered_events = []
 for event in all_events:
     if event['status'] in ['OPEN']:
-        if event['type'] in ['REFLECTIVE_DLL']:
-            if event['path'] in ['C:\\Windows\\System32\\inetsrv\\w3wp.exe']:
-                if event['recorded_device_info']['hostname'] in ['HOSTNAME01']:
+        if event['recorded_device_info']['hostname'] in ['HOSTNAME01']:
+            if event['type'] in ['REFLECTIVE_DOTNET']:
+                if event['path'] in ['C:\\Program Files (x86)\\Microsoft SQL Server\\100\\DTS\\Binn\\DTExec.exe']:
                     filtered_events.append(event)
+            if event['type'] in ['AMSI_BYPASS']:
+                if event['path'] in ['C:\\Program Files (x86)\\Microsoft SQL Server\\100\\DTS\\Binn\\SQLPS.exe']:
+                    filtered_events.append(event)
+
 
 #write data to disk
 filtered_events_df = pandas.DataFrame(filtered_events)
