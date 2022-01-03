@@ -587,7 +587,7 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
         response = requests.post(request_url, headers=headers, json=search)
 
         if debug_mode:
-            print(request_url, '\n returned', response.status_code)
+            print(request_url, 'returned', response.status_code)
 
         #check HTTP return code, and in case of error exit the method and return empty list
         if response.status_code != 200:
