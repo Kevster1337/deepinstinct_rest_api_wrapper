@@ -652,20 +652,20 @@ def get_device(device_id):
         return None
 
 #hides a list of event ids from the GUI and REST API
-def archive_events (ids, unarchive=False, suspicious=False, input_is_ids_only=True):
+def archive_events (event_id_list, unarchive=False, suspicious=False, input_is_ids_only=True):
 
     # if full events were provided, strip out just the ids before proceeding
     if not input_is_ids_only:
         event_ids = []
-        for event in ids:
+        for event in event_id_list:
             event_ids.append(event['id'])
-        ids = event_ids
+        event_id_list = event_ids
 
     # set headers (same for all requests in this method)
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
 
     # Create payload with list of event IDs as a Python dictionary
-    payload = {'ids': ids}
+    payload = {'ids': event_id_list}
 
     # calculate the appropriate url based on configuration
     if not suspicious and not unarchive:
@@ -685,18 +685,18 @@ def archive_events (ids, unarchive=False, suspicious=False, input_is_ids_only=Tr
 
 
 #hides a list of suspicious event ids from the GUI and REST API
-def archive_suspicious_events(ids, unarchive=False, input_is_ids_only=True):
-    return archive_events(ids=ids, suspicious=True, input_is_ids_only=input_is_ids_only)
+def archive_suspicious_events(event_id_list, unarchive=False, input_is_ids_only=True):
+    return archive_events(event_id_list=event_id_list, suspicious=True)
 
 
 #unhides a list of event ids from the GUI and REST API
-def unarchive_events(ids, suspicious=False, input_is_ids_only=True):
-    return archive_events(ids=ids, unarchive=True, suspicious=suspicious, input_is_ids_only=input_is_ids_only)
+def unarchive_events(event_id_list, suspicious=False, input_is_ids_only=True):
+    return archive_events(event_id_list=event_id_list, unarchive=True, suspicious=suspicious, input_is_ids_only=input_is_ids_only)
 
 
 #unhides a list of suspicious event ids from the GUI and REST API
-def unarchive_suspicious_events(ids, input_is_ids_only=True):
-    return unarchive_events(ids=ids, suspicious=True, input_is_ids_only=input_is_ids_only)
+def unarchive_suspicious_events(event_id_list, input_is_ids_only=True):
+    return unarchive_events(event_id_list=event_id_list, suspicious=True, input_is_ids_only=input_is_ids_only)
 
 
 #allows organization of exported data by server-specific folders
@@ -923,13 +923,21 @@ def request_agent_logs(device_id, device_id_only=True):
         print('ERROR: Unexpected return code', response.status_code, 'on POST to', request_url, 'with headers', headers)
         return False
 
-def close_events(event_id_list, open=False):
+def close_events(event_id_list, open=False, suspicious=False):
 
-    #calculate URL, headers, and payload
-    if open:
-        request_url = f'https://{fqdn}/api/v1/events/actions/open'
+    #calculate URL
+    if suspicious:
+        if open:
+            request_url = f'https://{fqdn}/api/v1/suspicious-events/actions/open'
+        else:
+            request_url = f'https://{fqdn}/api/v1/suspicious-events/actions/close'
     else:
-        request_url = f'https://{fqdn}/api/v1/events/actions/close'
+        if open:
+            request_url = f'https://{fqdn}/api/v1/events/actions/open'
+        else:
+            request_url = f'https://{fqdn}/api/v1/events/actions/close'
+
+    #calculate headers and payload
     headers = {'Authorization': key,
                 'accept': 'application/json',
                 'Content-Type': 'application/json'}
@@ -949,16 +957,30 @@ def close_events(event_id_list, open=False):
         print('ERROR: Unexpected return code', response.status_code, 'on POST to', request_url)
         return False
 
-def open_events(event_id_list):
-    return close_events(event_id_list=event_id_list, open=True)
+def close_suspicious_events(event_id_list):
+    return close_events(event_id_list=event_id_list, suspicious=True)
 
-def archive_events(event_id_list, unarchive=False):
+def open_events(event_id_list, suspicious=False):
+    return close_events(event_id_list=event_id_list, open=True, suspicious=suspicious)
 
-    #calculate URL, headers, and payload
-    if unarchive:
-        request_url = f'https://{fqdn}/api/v1/events/actions/unarchive'
+def open_suspicious_events(event_id_list):
+    return open_events(event_id_list=event_id_list, suspicious=True)
+
+def archive_events(event_id_list, unarchive=False, suspicious=False):
+
+    #calculate URL
+    if suspicious:
+        if unarchive:
+            request_url = f'https://{fqdn}/api/v1/suspicious-events/actions/unarchive'
+        else:
+            request_url = f'https://{fqdn}/api/v1/suspicious-events/actions/archive'
     else:
-        request_url = f'https://{fqdn}/api/v1/events/actions/archive'
+        if unarchive:
+            request_url = f'https://{fqdn}/api/v1/events/actions/unarchive'
+        else:
+            request_url = f'https://{fqdn}/api/v1/events/actions/archive'
+
+    #calculate headers and payload
     headers = {'Authorization': key,
                 'accept': 'application/json',
                 'Content-Type': 'application/json'}
@@ -977,10 +999,6 @@ def archive_events(event_id_list, unarchive=False):
     else:
         print('ERROR: Unexpected return code', response.status_code, 'on POST to', request_url)
         return False
-
-def unarchive_events(event_id_list):
-    return archive_events(event_id_list=event_id_list, unarchive=True)
-
 
 # Disable scanning and enforcement on a device
 def disable_device(device, device_id_only=False):

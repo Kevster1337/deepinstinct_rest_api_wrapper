@@ -26,7 +26,7 @@
 # 3. Optionally implement event filters by modifying the code below which
 #    organizes events into included_events | excluded_events
 # 4. Optionally modify the criteria for determining prevention readiness:
-#    min_days_since_deployment,max_days_since_last_contact,max_weekly_event_rate
+#    config['min_days_since_deployment'],config['max_days_since_last_contact'],config['max_weekly_event_rate']
 # 5. Save modified script (if any changes were made)
 # 6. Open a Command Prompt window, CD to the directory containing the 2 PY
 #    files, and run this command: python prevention_readiness.py
@@ -40,61 +40,74 @@ import deepinstinct30 as di, json, datetime, pandas
 from dateutil import parser
 
 #prompt for config
-di.fqdn = input('Enter FQDN of DI Server, or press enter to accept default [di-service.customers.deepinstinctweb.com]: ')
+di.fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [di-service.customers.deepinstinctweb.com]: ')
 if di.fqdn == '':
     di.fqdn = 'di-service.customers.deepinstinctweb.com'
 
 di.key = input('Enter API Key for DI Server: ')
 
-minimum_event_id = input('Enter minimum_event_id as an integer, or press enter to accept default [0]: ')
-if minimum_event_id == '':
-    minimum_event_id = 0
+config = {}
 
-min_days_since_deployment = input('Enter min_days_since_deployment as an integer, or press enter to accept default [10]: ')
-if min_days_since_deployment == '':
-    min_days_since_deployment = 10
+config['min_days_since_deployment'] = input('Enter minimum days since deployment, or press enter to accept the default [10]: ')
+if config['min_days_since_deployment'] == '':
+    config['min_days_since_deployment'] = 10
 
-max_days_since_last_contact = input('Enter mmax_days_since_last_contact as an integer, or press enter to accept default [3]: ')
-if max_days_since_last_contact == '':
-    max_days_since_last_contact = 3
+config['max_days_since_last_contact'] = input('Enter max days since last contact, or press enter to accept the default [3]: ')
+if config['max_days_since_last_contact'] == '':
+    config['max_days_since_last_contact'] = 3
 
-max_weekly_event_rate = input('Enter max_weekly_event_rate as an integer, or press enter to accept default [2]: ')
-if max_weekly_event_rate == '':
-    max_weekly_event_rate = 2
+config['max_weekly_event_rate'] = input('Enter max weekly event rate, or press enter to accept the default [2]: ')
+if config['max_weekly_event_rate'] == '':
+    config['max_weekly_event_rate'] = 2
 
-minimum_event_id = input('Enter minimum_event_id as an integer, or press enter to accept default [0]: ')
-if minimum_event_id == '':
-    minimum_event_id = 0
-
-user_response = input('Include closed events? Enter YES or NO, or press enter to accept default [NO]: ')
+user_response = input('Include closed events? Enter YES or NO, or press enter to accept the default [NO]: ')
 if user_response.lower() == 'yes':
-    include_closed_events = True
+    config['include_closed_events'] = True
 else:
-    include_closed_events = False
+    config['include_closed_events'] = False
 
-user_response = input('Enable debug mode? Enter YES or NO, or press enter to accept default [NO]: ')
+user_response = input('Include Ransomware Behavior events? Enter YES or NO, or press enter to accept the default [YES]: ')
+if user_response.lower() == 'no':
+    config['include_ransomware_behavior_events'] = False
+else:
+    config['include_ransomware_behavior_events'] = True
+
+user_response = input('Include In-Memory Protection Events? Enter YES or NO, or press enter to accept the default [YES]: ')
+if user_response.lower() == 'no':
+    config['include_in_memory_protection_events'] = False
+else:
+    config['include_in_memory_protection_events'] = True
+
+config['minimum_event_id'] = input('Enter minimum_event_id as an integer, or press enter to accept the default [0]: ')
+if config['minimum_event_id'] == '':
+    config['minimum_event_id'] = 0
+
+user_response = input('Enable debug mode? Enter YES or NO, or press enter to accept the default [NO]: ')
 if user_response.lower() == 'yes':
     di.debug_mode = True
+else:
+    di.debug_mode = False
 
 #get the data from DI server
 print('INFO: Gathering data')
-print('INFO: Calling get_devices')
+print('      Calling get_devices')
 devices = di.get_devices(include_deactivated=False)
-print('INFO: Calling get_policies')
+print('      Calling get_policies')
 policies = di.get_policies(include_policy_data=True)
-print('INFO: Calling get_groups')
+print('      Calling get_groups')
 groups = di.get_groups(exclude_default_groups=False)
-print('INFO: Calling get_events')
-all_events = di.get_events(minimum_event_id=minimum_event_id)
-print('INFO:', len(all_events), 'events were returned.')
-print('INFO: Beginning filtering events')
+print('      Calling get_events (this may take a while)')
+all_events = di.get_events(minimum_event_id=config['minimum_event_id'])
+print('     ', len(all_events), 'events were returned.')
+print('INFO: Filtering events')
 
 #define two lists to organize events into
 included_events = []
 excluded_events = []
 
 for event in all_events:
-    if event['status'] == 'OPEN' or include_closed_events:
+
+    if event['status'] == 'OPEN' or config['include_closed_events']:
 
         if event['type'] in ['STATIC_ANALYSIS']:
             if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
@@ -124,27 +137,45 @@ for event in all_events:
         #have confirmed to be False Positives (and handled via Allow List) or True
         #Positives.
 
-        elif event['type'] in ['RANSOMWARE_FILE_ENCRYPTION', 'REMOTE_CODE_INJECTION_EXECUTION', 'KNOWN_SHELLCODE_PAYLOADS', 'ARBITRARY_SHELLCODE', 'REFLECTIVE_DLL', 'REFLECTIVE_DOTNET', 'AMSI_BYPASS', 'DIRECT_SYSTEMCALLS', 'CREDENTIAL_DUMP', 'MALICIOUS_POWERSHELL_COMMAND_EXECUTION']:
-            included_events.append(event)
+        elif event['type'] in ['RANSOMWARE_FILE_ENCRYPTION']:
+            if config['include_ransomware_behavior_events']:
+                included_events.append(event)
 
-    #all events that didn't match any of the inclusion parameters above go here
+        elif event['type'] in ['REMOTE_CODE_INJECTION_EXECUTION', 'KNOWN_SHELLCODE_PAYLOADS', 'ARBITRARY_SHELLCODE', 'REFLECTIVE_DLL', 'REFLECTIVE_DOTNET', 'AMSI_BYPASS', 'DIRECT_SYSTEMCALLS', 'CREDENTIAL_DUMP']:
+            if config['include_in_memory_protection_events']:
+                included_events.append(event)
+
+        elif event['type'] in ['MALICIOUS_POWERSHELL_COMMAND_EXECUTION']:
+                included_events.append(event)
+
+        else:
+            excluded_events.append(event)
+
     else:
         excluded_events.append(event)
 
 
-print('INFO:', len(excluded_events), 'were excluded from analysis and', len(included_events), 'events remain')
+print('     ', len(excluded_events), 'were excluded from analysis and', len(included_events), 'events remain')
 
 #count the filtered events by device_id
 print('INFO: Summarizing included events by device_id')
 event_counts = di.count_data_by_field(included_events, 'device_id')
 
 print('INFO: Adding prevention_mode field to policy data')
+prevention_policy_count = 0
+detection_policy_count = 0
 for policy in policies:
     policy['prevention_mode'] = di.is_prevention_policy(policy)
     if policy['prevention_mode']:
-        print('INFO:', policy['os'], policy['id'], policy['name'], 'is a prevention mode policy')
+        prevention_policy_count += 1
+        if di.debug_mode:
+            print('INFO:', policy['os'], policy['id'], policy['name'], 'is a prevention mode policy')
     else:
-        print('INFO:', policy['os'], policy['id'], policy['name'], 'is not a prevention mode policy (detection or hybrid)')
+        detection_policy_count += 1
+        if di.debug_mode:
+            print('INFO:', policy['os'], policy['id'], policy['name'], 'is not a prevention mode policy (detection or hybrid)')
+print('      Found', prevention_policy_count, 'prevention policies and', detection_policy_count, 'detection/hybrid policies')
+
 
 #add in_prevention field to devices
 print('INFO: Adding prevention_mode field to device data')
@@ -162,7 +193,7 @@ for device in devices:
         device['event_count'] = 0
 
 #add associated policy name and prevention mode to group data (for display purposes only)
-print('INFO: Adding policy_name and prevention_mode to group data')
+print('INFO: Adding policy_name and prevention_mode to device group data')
 for group in groups:
     for policy in policies:
         if group['policy_id'] == policy['id']:
@@ -191,9 +222,9 @@ for device in devices:
 print('INFO: Evaluating devices to determine prevention readiness and recoding it in device data as ready_for_prevention')
 for device in devices:
     device['ready_for_prevention'] = False
-    if device['days_since_deployment'] >= int(min_days_since_deployment):
-        if device['last_contact_days_ago'] <= int(max_days_since_last_contact):
-            if device['weekly_event_rate'] <= int(max_weekly_event_rate):
+    if device['days_since_deployment'] >= int(config['min_days_since_deployment']):
+        if device['last_contact_days_ago'] <= int(config['max_days_since_last_contact']):
+            if device['weekly_event_rate'] <= int(config['max_weekly_event_rate']):
                 device['ready_for_prevention'] = True
 
 #sort devices into 3 lists by category
@@ -224,7 +255,10 @@ for group in groups:
         groups_with_devices_ready_for_prevention.append(group)
 print('INFO: Done with calculations')
 
-print('INFO: Converting data to Pandas dataframes to prepare to export to disk')
+#export data to disk
+folder_name = di.create_export_folder()
+file_name = f'prevention_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC.xlsx'
+print('INFO: Exporting results including source data to disk as', f'{folder_name}/{file_name}')
 event_counts_df = pandas.DataFrame((event_counts.items()))
 devices_df = pandas.DataFrame(devices)
 policies_df = pandas.DataFrame(policies)
@@ -235,12 +269,6 @@ devices_not_ready_for_prevention_df = pandas.DataFrame(devices_not_ready_for_pre
 all_events_df = pandas.DataFrame(all_events)
 included_events_df = pandas.DataFrame(included_events)
 excluded_events_df = pandas.DataFrame(excluded_events)
-
-print('INFO: Creating output folder and calculating file name')
-folder_name = di.create_export_folder()
-file_name = f'prevention_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC.xlsx'
-
-print('INFO: Writing data to disk as', f'{folder_name}/{file_name}')
 with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
     devices_ready_for_prevention_df.to_excel(writer, sheet_name='ready_for_prevention', index=False)
     devices_not_ready_for_prevention_df.to_excel(writer, sheet_name='not_ready_for_prevention', index=False)
@@ -252,9 +280,6 @@ with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
     all_events_df.to_excel(writer, sheet_name='all_events', index=False)
     included_events_df.to_excel(writer, sheet_name='included_events', index=False)
     excluded_events_df.to_excel(writer, sheet_name='excluded_events', index=False)
-
-print('INFO: Done writing data to disk')
-
 
 #print summary data
 print()
@@ -269,11 +294,7 @@ print()
 print('-----')
 print('CRITERIA USED IN ABOVE CALCULATIONS:')
 print('-----')
-print('min_days_since_deployment:', min_days_since_deployment)
-print('max_days_since_last_contact:', max_days_since_last_contact)
-print('max_weekly_event_rate:', max_weekly_event_rate)
-print('minimum_event_id:', minimum_event_id)
-print('include_closed_events:', include_closed_events)
+print(json.dumps(config, indent=4))
 print()
 print('The', len(devices_ready_for_prevention), 'devices ready to move to prevention are currently in the following', len(groups_with_devices_ready_for_prevention), 'Device Group(s):')
 print(json.dumps(groups_with_devices_ready_for_prevention, indent=4))
@@ -338,7 +359,7 @@ if execute_moves_now:
                 print('ERROR: The move of devices from group', source_group_id, 'to group', destination_group_id, 'failed.')
         else:
             print('WARNING: Skipping move of devices currently in group', source_group_id, 'based on response above:', user_input)
-    print()
+
     print('INFO: Done with device moves')
 
 print('INFO: Script is complete')
