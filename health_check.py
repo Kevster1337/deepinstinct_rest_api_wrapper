@@ -1,25 +1,13 @@
 import deepinstinct30 as di
 
-di.fqdn = input('FQDN? ')
-di.key = input('API Key? ')
+di.fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [di-service.customers.deepinstinctweb.com]: ')
+if di.fqdn == '':
+    di.fqdn = 'di-service.customers.deepinstinctweb.com'
 
-print('INFO: Exporting devices')
-di.export_devices()
+di.key = input('Enter API Key for DI Server: ')
 
-print('INFO: Exporting policies')
-di.export_policies(include_allow_deny_lists=True)
-
-print('INFO: Exporting groups')
-di.export_groups()
-
-print('INFO: Exporting events')
-minimum_event_id = input('First event ID to export (default 0)? ')
+minimum_event_id = input('Enter minimum_event_id as an integer, or press enter to accept the default [0]: ')
 if minimum_event_id == '':
     minimum_event_id = 0
-di.export_events(minimum_event_id=minimum_event_id)
 
-print('INFO: Calling warranty_compliance_check.py')
-exec(open('warranty_compliance_check.py').read())
-
-print('INFO: Calling license_usage_report_by_tenant.py')
-exec(open('license_usage_report_by_tenant.py').read())
+di.health_check(minimum_event_id=minimum_event_id)

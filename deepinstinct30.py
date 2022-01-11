@@ -48,7 +48,7 @@ def export_devices(include_deactivated=False):
     #write data to disk
     devices_df.to_excel(f'{folder_name}/{file_name}', index=False)
     #return confirmation message
-    return ('INFO: ' + str(len(devices)) + f' devices written to {folder_name}/{file_name}')
+    print (f'INFO: {str(len(devices))} devices exported to {folder_name}/{file_name}')
 
 
 # Accepts a list of (exact hostnames | hostname regex patterns | CIDRs) and
@@ -129,6 +129,7 @@ def export_policies(include_allow_deny_lists=True):
     android_policies = []
     chrome_policies = []
     network_agentless_policies = []
+    linux_policies = []
     for policy in policies:
         if policy['os'] == 'WINDOWS':
             windows_policies.append(policy)
@@ -140,46 +141,31 @@ def export_policies(include_allow_deny_lists=True):
             ios_policies.append(policy)
         elif policy['os'] == 'NETWORK_AGENTLESS':
             network_agentless_policies.append(policy)
+        elif policy['os'] == 'LINUX':
+            linux_policies.append(policy)
 
-    # Convert to Pandas dataframes (to allow easy exports to Excel)
+    #create dataframes to allow subsequent export to Excel
     windows_policies_df = pandas.DataFrame(windows_policies)
     mac_policies_df = pandas.DataFrame(mac_policies)
     ios_policies_df = pandas.DataFrame(ios_policies)
     android_policies_df = pandas.DataFrame(android_policies)
     chrome_policies_df = pandas.DataFrame(chrome_policies)
     network_agentless_policies_df = pandas.DataFrame(network_agentless_policies)
+    linux_policies_df = pandas.DataFrame(linux_policies)
 
-    # Get current timestamp and format for usage in exported filenames
+    #export dataframes to disk
     timestamp = datetime.datetime.today().strftime('%Y-%m-%d_%H.%M')
-
-    # Export data to disk
-
     folder_name = create_export_folder()
-
-    file_name = f'windows_policies_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    windows_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(windows_policies), 'policies written to', f'{folder_name}/{file_name}')
-
-    file_name = f'mac_policies.xlsx_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    mac_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(mac_policies), 'policies written to', f'{folder_name}/{file_name}')
-
-    file_name = f'ios_policies.xlsx_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    ios_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(ios_policies), 'policies written to', f'{folder_name}/{file_name}')
-
-    file_name = f'android_policies_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    android_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(android_policies), 'policies written to', f'{folder_name}/{file_name}')
-
-    file_name = f'chrome_policies_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    chrome_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(chrome_policies), 'policies written to', f'{folder_name}/{file_name}')
-
-    file_name = f'network_agentless_policies_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
-    network_agentless_policies_df.to_excel(f'{folder_name}/{file_name}', index=False)
-    print('INFO:', len(network_agentless_policies), 'policies written to', f'{folder_name}/{file_name}')
-
+    file_name = f'deepinstinct_policies_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
+    with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
+        windows_policies_df.to_excel(writer, sheet_name='Windows', index=False)
+        mac_policies_df.to_excel(writer, sheet_name='macOS', index=False)
+        ios_policies_df.to_excel(writer, sheet_name='iOS', index=False)
+        android_policies_df.to_excel(writer, sheet_name='Android', index=False)
+        chrome_policies_df.to_excel(writer, sheet_name='Chrome OS', index=False)
+        linux_policies_df.to_excel(writer, sheet_name='Linux', index=False)
+        network_agentless_policies_df.to_excel(writer, sheet_name='Agentless', index=False)
+    print(f'INFO: {str(len(policies))} policies exported to {folder_name}/{file_name}')
 
 # Enable automatic upgrade setting in policies
 def enable_upgrades(platforms=['WINDOWS','MAC'], automatic_upgrade=True, return_modified_policies_id_list=False):
@@ -816,7 +802,7 @@ def export_events(minimum_event_id=0, suspicious=False, flatten_device_info=True
 
         #now that we have what we know is a valid list of coulmns, proceed
         events_df.to_excel(f'{folder_name}/{file_name}', index=False, sheet_name='Event_Data', columns=columns)
-        print('INFO:', len(events), 'events were exported to disk as:', f'{folder_name}/{file_name}')
+        print (f'INFO: {str(len(events))} events exported to {folder_name}/{file_name}')
     else:
         print('WARNING: No events were found on the server')
 
@@ -826,6 +812,7 @@ def export_groups(exclude_default_groups=False):
     folder_name = create_export_folder()
     file_name = f'groups_{datetime.datetime.today().strftime("%Y-%m-%d_%H.%M")}_{fqdn.split(".",1)[0]}.xlsx'
     groups_df.to_excel(f'{folder_name}/{file_name}', index=False)
+    print (f'INFO: {str(len(groups))} groups exported to {folder_name}/{file_name}')
 
 
 def create_tenant(tenant_name, license_limit, msp_name):
@@ -1276,3 +1263,15 @@ def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['W
                         print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
 
     print('INFO: Done migrating', len(policies_to_migrate), 'policies from MSP', source_msp_id , 'to MSP', destination_msp_id)
+
+def health_check(minimum_event_id=0):
+    export_devices()
+    print()
+    export_policies()
+    print()
+    export_groups()
+    print()
+    export_events(minimum_event_id=minimum_event_id)
+    print()
+    import warranty_compliance_check as wcs
+    wcs.do_warranty_compliance_check(fqdn=fqdn, key=key, exclude_empty_policies=True)
