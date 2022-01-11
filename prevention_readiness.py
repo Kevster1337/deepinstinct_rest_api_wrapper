@@ -82,23 +82,17 @@ config['minimum_event_id'] = input('Enter minimum_event_id as an integer, or pre
 if config['minimum_event_id'] == '':
     config['minimum_event_id'] = 0
 
-user_response = input('Enable debug mode? Enter YES or NO, or press enter to accept the default [NO]: ')
-if user_response.lower() == 'yes':
-    di.debug_mode = True
-else:
-    di.debug_mode = False
-
 #get the data from DI server
 print('INFO: Gathering data')
-print('      Calling get_devices')
+print('\tCalling get_devices')
 devices = di.get_devices(include_deactivated=False)
-print('      Calling get_policies')
+print('\tCalling get_policies')
 policies = di.get_policies(include_policy_data=True)
-print('      Calling get_groups')
+print('\tCalling get_groups')
 groups = di.get_groups(exclude_default_groups=False)
-print('      Calling get_events (this may take a while)')
+print('\tCalling get_events (this may take a while)')
 all_events = di.get_events(minimum_event_id=config['minimum_event_id'])
-print('     ', len(all_events), 'events were returned.')
+print('\t', len(all_events), 'events were returned.')
 print('INFO: Filtering events')
 
 #define two lists to organize events into
