@@ -10,34 +10,24 @@
 # DI REST API.
 #
 
-# Prompt use for D-Appliance Version, validate input, then import appropriate
-# version of the REST API Wrapper
-di_version = ''
-while di_version not in ['3.0', '2.5']:
-    di_version = input('DI Server Version [3.0 | 2.5]? ')
-if di_version == '3.0':
-    import deepinstinct30 as di
-else:
-    import deepinstinct25 as di
+import deepinstinct30 as di
 
-# Optional hardcoded config - if not provided, you'll be prompted at runtime
-di.fqdn = 'SERVER-NAME.customers.deepinstinctweb.com'
-di.key = 'API-KEY'
+#prompt for config
+di.fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [di-service.customers.deepinstinctweb.com]: ')
+if di.fqdn == '':
+    di.fqdn = 'di-service.customers.deepinstinctweb.com'
 
-# Validate config and prompt if not provided above
-while di.fqdn in ('SERVER-NAME.customers.deepinstinctweb.com', ''):
-    di.fqdn = input('FQDN of DI Server? ')
-while di.key in ('API-KEY', ''):
-    di.key = input('API Key? ')
+di.key = input('\nEnter API Key for DI Server: ')
 
 #Prompt for Device Group Name
-device_group_name = input('Device Group Name? ')
+device_group_name = input('\nEnter Device Group Name to move devices to: ')
 
 #Prompt for hostname(s)
 device_name_list = []
 device_name = None
+print('\nInstructions: Below you will enter the hotname(s) of the device(s) to move with one per line. Suggest to copy/paste from an Excel document or text file. Ensure that there are no leading or trailing spaces, quotations, or other characters. When you are done entering hostnames, provide no input and press return to continue.\n')
 while device_name != '':
-    device_name = input('Enter hostname to add, or press enter to exit: ')
+    device_name = input('Enter a hostname (or just press return to exit): ')
     if device_name != '':
         device_name_list.append(device_name)
 
