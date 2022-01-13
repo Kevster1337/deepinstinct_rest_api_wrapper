@@ -82,6 +82,31 @@ config['minimum_event_id'] = input('Enter minimum_event_id as an integer, or pre
 if config['minimum_event_id'] == '':
     config['minimum_event_id'] = 0
 
+#build search parameters for events based on config
+search_parameters = {}
+
+search_parameters['status'] = ['OPEN']
+if config['include_closed_events']:
+    search_parameters['status'].append('CLOSED')
+
+search_parameters['type'] = []
+search_parameters['type'].append('STATIC_ANALYSIS')
+search_parameters['type'].append('MALICIOUS_POWERSHELL_COMMAND_EXECUTION')
+search_parameters['type'].append('SUSPICIOUS_SCRIPT_EXCECUTION')
+if config['include_ransomware_behavior_events']:
+    search_parameters['type'].append('RANSOMWARE_FILE_ENCRYPTION')
+if config['include_in_memory_protection_events']:
+    search_parameters['type'].append('REMOTE_CODE_INJECTION_EXECUTION')
+    search_parameters['type'].append('KNOWN_SHELLCODE_PAYLOADS')
+    search_parameters['type'].append('ARBITRARY_SHELLCODE')
+    search_parameters['type'].append('REFLECTIVE_DLL')
+    search_parameters['type'].append('REFLECTIVE_DOTNET')
+    search_parameters['type'].append('AMSI_BYPASS')
+    search_parameters['type'].append('DIRECT_SYSTEMCALLS')
+    search_parameters['type'].append('CREDENTIAL_DUMP')
+search_parameters['threat_severity'] = ['MODERATE', 'HIGH', 'VERY_HIGH']
+
+
 #get the data from DI server
 print('INFO: Gathering data')
 print('\tCalling get_devices')
@@ -90,70 +115,13 @@ print('\tCalling get_policies')
 policies = di.get_policies(include_policy_data=True)
 print('\tCalling get_groups')
 groups = di.get_groups(exclude_default_groups=False)
-print('\tCalling get_events (this may take a while)')
-all_events = di.get_events(minimum_event_id=config['minimum_event_id'])
-print('\t', len(all_events), 'events were returned.')
-print('INFO: Filtering events')
-
-#define two lists to organize events into
-included_events = []
-excluded_events = []
-
-for event in all_events:
-
-    if event['status'] == 'OPEN' or config['include_closed_events']:
-
-        if event['type'] in ['STATIC_ANALYSIS']:
-            if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
-                included_events.append(event)
-
-            # TODO: You can add more filters here for patterns of activity you have
-            # either confirmed as a True Positive -or- you have confirmed as a
-            # False Positive and added the appropriate allow list. Some examples
-            # are below (commented out). You need to remove/comment out the above
-            # code block and replace it wabuild *nested* if statements with a single
-            # 'append' statement at the end
-
-            #if event['type'] in ['STATIC_ANALYSIS']:
-                #if event['threat_severity'] in ['MODERATE', 'HIGH', 'VERY_HIGH']:
-                    #if event['file_hash'] not in ['alpha', 'bravo']:
-                        #if event['path'][0:10] not in ['c:\\echo\\foxtrot\\']:
-                            #if event['path'][0:28] not in ['/Users/paulinejolly/Library/']:
-                                #if event['path'][0:22] not in ['/Users/workspace/berk/']:
-                                    #included_events.append(event)
-
-        #TODO: You might also consider removing some/many event types below, which
-        #means they will always be excluded from analysis. This is useful if, for
-        #example, you are evaluating Prevention Readiness only for specific DI
-        #policy feature(s).
-        #Alternately, you might create additional code based on the example
-        #above (for Static Analysis) which excludes Behavioral events which you
-        #have confirmed to be False Positives (and handled via Allow List) or True
-        #Positives.
-
-        elif event['type'] in ['RANSOMWARE_FILE_ENCRYPTION']:
-            if config['include_ransomware_behavior_events']:
-                included_events.append(event)
-
-        elif event['type'] in ['REMOTE_CODE_INJECTION_EXECUTION', 'KNOWN_SHELLCODE_PAYLOADS', 'ARBITRARY_SHELLCODE', 'REFLECTIVE_DLL', 'REFLECTIVE_DOTNET', 'AMSI_BYPASS', 'DIRECT_SYSTEMCALLS', 'CREDENTIAL_DUMP']:
-            if config['include_in_memory_protection_events']:
-                included_events.append(event)
-
-        elif event['type'] in ['MALICIOUS_POWERSHELL_COMMAND_EXECUTION']:
-                included_events.append(event)
-
-        else:
-            excluded_events.append(event)
-
-    else:
-        excluded_events.append(event)
-
-
-print('     ', len(excluded_events), 'were excluded from analysis and', len(included_events), 'events remain')
+print('\tCalling get_events (this may take a while) using search_parameters:\n', search_parameters)
+events = di.get_events(minimum_event_id=config['minimum_event_id'], search=search_parameters)
+print('\t', len(events), 'events were returned from server.')
 
 #count the filtered events by device_id
-print('INFO: Summarizing included events by device_id')
-event_counts = di.count_data_by_field(included_events, 'device_id')
+print('INFO: Summarizing events by device_id')
+event_counts = di.count_data_by_field(events, 'device_id')
 
 print('INFO: Adding prevention_mode field to policy data')
 prevention_policy_count = 0
@@ -260,9 +228,7 @@ groups_df = pandas.DataFrame(groups)
 devices_already_in_prevention_df = pandas.DataFrame(devices_already_in_prevention)
 devices_ready_for_prevention_df = pandas.DataFrame(devices_ready_for_prevention)
 devices_not_ready_for_prevention_df = pandas.DataFrame(devices_not_ready_for_prevention)
-all_events_df = pandas.DataFrame(all_events)
-included_events_df = pandas.DataFrame(included_events)
-excluded_events_df = pandas.DataFrame(excluded_events)
+events_df = pandas.DataFrame(events)
 with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
     devices_ready_for_prevention_df.to_excel(writer, sheet_name='ready_for_prevention', index=False)
     devices_not_ready_for_prevention_df.to_excel(writer, sheet_name='not_ready_for_prevention', index=False)
@@ -271,9 +237,7 @@ with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
     event_counts_df.to_excel(writer, sheet_name='event_counts', index=False)
     policies_df.to_excel(writer, sheet_name='policies', index=False)
     groups_df.to_excel(writer, sheet_name='groups', index=False)
-    all_events_df.to_excel(writer, sheet_name='all_events', index=False)
-    included_events_df.to_excel(writer, sheet_name='included_events', index=False)
-    excluded_events_df.to_excel(writer, sheet_name='excluded_events', index=False)
+    events_df.to_excel(writer, sheet_name='events', index=False)
 
 #print summary data
 print()
