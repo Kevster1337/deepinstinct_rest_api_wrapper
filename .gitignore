@@ -3,3 +3,4 @@
 *.xlsx
 exported_data_from_*.deepinstinctweb.com/*
 *_audit.py
+*_question*.py

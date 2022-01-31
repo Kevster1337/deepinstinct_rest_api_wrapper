@@ -176,6 +176,8 @@ else:
                     response = requests.post(request_url, headers=headers, json=payload)
                     if response.status_code == 204:
                         print('      Successfully copied', len( policy['allow_deny_and_exclusion_lists'][list_type]['items'] ), 'entries of type', list_type)
+                    elif response.status_code == 404:
+                        print('WARNING: Response', response.status_code, 'on POST to', request_url, '. This indicates data of this type existed on the source server but was not migrated to the destination server lacking the required API method.')
                     else:
                         print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
                         sys.exit(0)

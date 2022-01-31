@@ -2,7 +2,7 @@
 # Patrick Van Zandt, Principal Professional Services Engineer, Deep Instinct
 #
 # Compatibility:
-# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, and 3.2.x
+# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, 3.2.x, and 3.3.x
 # -Written and tested using a Python 3.8.3 instance installed by Anaconda
 #
 # Suggested Usage:
