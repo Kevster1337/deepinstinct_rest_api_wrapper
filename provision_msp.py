@@ -39,9 +39,9 @@
 # USAGE
 # 1. Save the latest version of both this file (provision_msp.py) and
 #    the DI API Wrapper (deepinstinct30.py) to the same folder on disk.
-# 2. Edit this file to provide the customer name, license count, server, and
-#    api key in-line below.
-# 3. Execute the script with this command:  python policy_migration.py
+# 2. Edit this file to provide the customer name, license count, server, api
+#    key, and the id of the template msp in-line below.
+# 3. Execute the script with this command:  python provision_msp.py
 
 
 #define details of the new customer
