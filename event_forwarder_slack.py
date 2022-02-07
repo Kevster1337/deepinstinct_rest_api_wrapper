@@ -78,7 +78,7 @@ while True:
 
     try:
         new_events = di.get_events(minimum_event_id=max_event_processed_previously, search=search_parameters)
-    except:
+    except requests.exceptions.RequestException as e:
         now = datetime.datetime.now()
         print(now.strftime("%H:%M"), 'ERROR:', e)
         new_events = []
