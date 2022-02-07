@@ -1,8 +1,33 @@
+# event_forwarder_slack.py
+# Author: Patrick Van Zandt, Principal Professional Services Engineer
+# February 2022
+
+# This script provides an example of how to use the Deep Instinct REST API
+# Wrapper published at https://github.com/pvz01/deepinstinct_rest_api_wrapper
+# to forward new DI events to Slack using a Slack Incoming Webhook.
+
+# This script is provided as-is and with no warranty. Use at your own risk, and
+# please test in a non-production environment first.
+
+# PREREQUISITES
+# 1. Python 3.8 or later
+# 2. Deep Instinct REST API Wrapper
+# 3. Third-party libraries (strongly recommend to install Anaconda)
+# 4. Network access to management server on port 443
+# 5. API Key with minimum of Read Only access
+
+# USAGE
+# 1. Save the latest version of both this file (event_forwarder_slack.py) and
+#    the DI API Wrapper (deepinstinct30.py) to the same folder on disk.
+# 2. Review and adjust configuration in-line below, then save changes.
+# 3. Execute the script with this command: python event_forwarder_slack.py
+
+
 #---import required libraries---
 import time, json, requests, datetime, deepinstinct30 as di
 
 
-#---config---
+#---configuration---
 di.fqdn = 'FOO.customers.deepinstinctweb.com'
 di.key = 'BAR'
 
@@ -22,8 +47,14 @@ fields_to_remove = ['msp_name', 'msp_id', 'tenant_name', 'tenant_id',
                     'recorded_device_info',
                     'file_status', 'sandbox_status']
 
+# Define search parameters when querying DI server for new events
+search_parameters = {}
+#search_parameters['status'] = ['OPEN', 'CLOSED']
+#search_parameters['type'] = ['STATIC_ANALYSIS', 'RANSOMWARE_FILE_ENCRYPTION']
+#search_parameters['threat_severity'] = ['HIGH', 'VERY_HIGH']
 
-#---method definition---
+
+#---define methods used at runtime---
 
 # a method for forwarding a single event to Slack using the provided webhook_url
 def send_event_to_slack(event):
@@ -46,7 +77,7 @@ while True:
     print('Getting new events with id greater than', max_event_processed_previously)
 
     try:
-        new_events = di.get_events(minimum_event_id=max_event_processed_previously)
+        new_events = di.get_events(minimum_event_id=max_event_processed_previously, search=search_parameters)
     except:
         now = datetime.datetime.now()
         print(now.strftime("%H:%M"), 'ERROR:', e)
