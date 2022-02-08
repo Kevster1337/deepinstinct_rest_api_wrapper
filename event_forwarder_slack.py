@@ -41,10 +41,6 @@ import time, json, requests, datetime, deepinstinct30 as di
 di.fqdn = 'FOO.customers.deepinstinctweb.com'
 di.key = 'BAR'
 
-# When restarting script, set this to the previous highest event ID to avoid
-# resending previously sent events. Otherwise set to 0.
-max_event_processed_previously = 0
-
 # Define sleep time between queries to server in seconds (default 5 minutes)
 sleep_time_in_seconds = 300
 
