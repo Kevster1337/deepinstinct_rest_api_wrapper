@@ -20,7 +20,17 @@
 # 1. Save the latest version of both this file (event_forwarder_slack.py) and
 #    the DI API Wrapper (deepinstinct30.py) to the same folder on disk.
 # 2. Review and adjust configuration in-line below, then save changes.
+# 3. By default the script will pull all events matching your configured search
+#    parameters. To start at a specific event ID, save that ID as a file
+#    'event_forwarder_slack.conf' in the same directory as the script.
 # 3. Execute the script with this command: python event_forwarder_slack.py
+
+# NOTE: In order to avoid re-sending the same events, the script maintains a
+#       record of the last event previously sent on disk. This is stored in
+#       'event_forwarder_slack.conf' in the same directory as the script. This
+#       allows preservation of this "high water mark" even if the script is
+#       killed and restarted. Be cautious not to delete/rename/move the .conf
+#       file. Doing so will cause the script to re-send all events.
 
 
 #---import required libraries---
@@ -71,9 +81,27 @@ def sanitize_event(event):
     for field in fields_to_remove:
         remove_key(event, field)
 
+# a method to read config from .conf file on disk
+def get_config():
+    try:
+        with open('event_forwarder_slack.conf', 'r') as f:
+            max_event_processed_previously = int(f.read())
+    except OSError as e:
+        max_event_processed_previously = 0
+
+# a method to write config to .conf file on disk
+def save_config():
+    try:
+        with open('event_forwarder_slack.conf', 'w') as f:
+            f.write(str(max_event_processed_previously))
+    except OSError as e:
+        now = datetime.datetime.now()
+        print(now.strftime("%H:%M"), 'ERROR:', e)
+
 
 #---runtime---
 while True:
+    get_config()
     print('Getting new events with id greater than', max_event_processed_previously)
 
     try:
@@ -99,5 +127,6 @@ while True:
                 max_event_processed_previously = event['id']
 
     print('max_event_processed_previously is now', max_event_processed_previously)
+    save_config()
     print('Sleeping for', sleep_time_in_seconds, 'seconds')
     time.sleep(sleep_time_in_seconds)
