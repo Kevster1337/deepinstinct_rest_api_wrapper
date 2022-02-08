@@ -81,15 +81,15 @@ def sanitize_event(event):
 def get_config():
     try:
         with open('event_forwarder_slack.conf', 'r') as f:
-            max_event_processed_previously = int(f.read())
+            return int(f.read())
     except OSError as e:
-        max_event_processed_previously = 0
+        return 0
 
 # a method to write config to .conf file on disk
-def save_config():
+def save_config(event_id):
     try:
         with open('event_forwarder_slack.conf', 'w') as f:
-            f.write(str(max_event_processed_previously))
+            f.write(str(event_id))
     except OSError as e:
         now = datetime.datetime.now()
         print(now.strftime("%H:%M"), 'ERROR:', e)
@@ -97,7 +97,7 @@ def save_config():
 
 #---runtime---
 while True:
-    get_config()
+    max_event_processed_previously = get_config()
     print('Getting new events with id greater than', max_event_processed_previously)
 
     try:
@@ -123,6 +123,6 @@ while True:
                 max_event_processed_previously = event['id']
 
     print('max_event_processed_previously is now', max_event_processed_previously)
-    save_config()
+    save_config(max_event_processed_previously)
     print('Sleeping for', sleep_time_in_seconds, 'seconds')
     time.sleep(sleep_time_in_seconds)
