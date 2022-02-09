@@ -6,8 +6,8 @@
 # Wrapper published at https://github.com/pvz01/deepinstinct_rest_api_wrapper
 # to generate e-mail notifications using your own custom template. This sample
 # uses https://pypi.org/project/yagmail/ to send e-mail using a GMail account,
-# but you can replace the send_mail() method with your own code to use any
-# library and e-mail service of your choice.
+# but you can replace the  send_event_via_email method with your own code to use
+# any library and e-mail service of your choice.
 
 # This script is provided as-is and with no warranty. Use at your own risk, and
 # please test in a non-production environment first.
@@ -26,7 +26,9 @@
 # 3. By default the script will pull all events matching your configured search
 #    parameters. To start at a specific event ID, save that ID as a file
 #    'event_forwarder_email.conf' in the same directory as the script.
-# 3. Execute the script with this command: python event_forwarder_email.py
+# 4. Optionally replace or modify the send_event_via_email() method to use
+#    any mail template, library, or service of your choosing.
+# 5. Execute the script with this command: python event_forwarder_email.py
 
 # NOTE: In order to avoid re-sending the same events, the script maintains a
 #       record of the last event previously sent on disk. This is stored in
