@@ -6,3 +6,7 @@ exported_data_from_*.deepinstinctweb.com/*
 *_question*.py
 *.conf
 _dev.py
+*.pptx
+*.docx
+*.xlsx
+*.exe
