@@ -1275,3 +1275,18 @@ def health_check(minimum_event_id=0):
     print()
     import warranty_compliance_check as wcs
     wcs.do_warranty_compliance_check(fqdn=fqdn, key=key, exclude_empty_policies=True)
+
+def add_process_exclusion(exclusion, comment, policy_id, exclusion_type='process_path'):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/exclusion-list/{exclusion_type}'
+    headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
+    payload = {'items': [ {'item': exclusion, 'comment': comment} ]}
+    response = requests.post(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully added', exclusion_type, 'exclusion', exclusion, 'to policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
+        return False
+
+def add_folder_exclusion(exclusion, comment, policy_id):
+    return add_process_exclusion(exclusion=exclusion, comment=comment, policy_id=policy_id, exclusion_type='folder_path')
