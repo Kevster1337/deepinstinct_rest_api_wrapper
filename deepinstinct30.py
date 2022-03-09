@@ -575,14 +575,14 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
         else:
             request_url = f'https://{fqdn}/api/v1/events/search?after_event_id={str(minimum_event_id)}'
 
-        #make request to server, store response
-        response = requests.post(request_url, headers=headers, json=search)
+        try:
+            #make request to server, store response
+            response = requests.post(request_url, headers=headers, json=search, timeout=30)
+        except requests.exceptions.RequestException:
+            print('WARNING: Exception on', request_url, '. Will sleep for 10 seconds and try again.')
+            time.sleep(10)
 
-        #check HTTP return code, and in case of error exit the method and return empty list
-        if response.status_code != 200:
-            print('ERROR:', request_url, 'returned unexpected response code:', response.status_code)
-            return []
-        else:
+        if response.status_code == 200:
             #store the returned last_id value
             minimum_event_id = response.json()['last_id']
 
@@ -777,9 +777,9 @@ def delete_policy(policy_id):
         'on DELETE to', request_url)
         return False
 
-def export_events(minimum_event_id=0, suspicious=False, flatten_device_info=True):
+def export_events(minimum_event_id=0, suspicious=False, flatten_device_info=True, search={}):
 
-    events = get_events(minimum_event_id=minimum_event_id, suspicious=suspicious)
+    events = get_events(minimum_event_id=minimum_event_id, suspicious=suspicious, search=search)
 
     if len(events) > 0:
         if flatten_device_info:
