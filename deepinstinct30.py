@@ -1290,3 +1290,21 @@ def add_process_exclusion(exclusion, comment, policy_id, exclusion_type='process
 
 def add_folder_exclusion(exclusion, comment, policy_id):
     return add_process_exclusion(exclusion=exclusion, comment=comment, policy_id=policy_id, exclusion_type='folder_path')
+
+def add_allow_list_hashes(hash_list, policy_id):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/hashes'
+    headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
+
+    item_list = []
+    for hash in hash_list:
+        item = {'item': hash, 'comment': ' '}
+        item_list.append(item)
+    payload = {'items': item_list}
+
+    response = requests.post(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully added', len(hash_list), 'hashes to allow list for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
+        return False
