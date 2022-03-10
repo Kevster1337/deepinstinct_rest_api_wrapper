@@ -11,7 +11,7 @@
 #
 
 # import required libraries
-import deepinstinct30 as di, json, datetime, pandas
+import deepinstinct30 as di, json, datetime, pandas, re
 from dateutil import parser
 
 # Calculates deployment phase for a Windows policy. Non-conforming and non-Windows policies return 0.
@@ -92,42 +92,44 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     di.key = key
     config = config
 
-    print('INFO: Calculating event search parameters')
-    search_parameters = get_event_search_parameters(config['deployment_phase'])
-
-    #go get all the data from server
-    print('INFO: Getting device list from server')
-    devices = di.get_devices(include_deactivated=False)
+    #collect policy data
     print('INFO: Getting policy list and data from server')
     policies = di.get_policies(include_policy_data=True)
-    print('INFO: Getting events from server using search criteria', search_parameters)
-    events = di.get_events(search=search_parameters)
-
     #calculate deployment_phase for each policy and add to policy data
     print('INFO: Evaluating policy data to determine deployment phase(s)')
-    print('phase\t id\t os\t name')
+    print('phase\t id\t name')
     for policy in policies:
         policy['deployment_phase'] = classify_policy(policy)
-        print(policy['deployment_phase'], '\t', policy['id'], '\t', policy['os'], '\t', policy['name'])
+        if policy['os'] == 'WINDOWS':
+            print(policy['deployment_phase'], '\t', policy['id'], '\t', policy['name'])
 
-    #add deployment_phase field to devices
+    #collect event data
+    print('INFO: Calculating event search parameters')
+    search_parameters = get_event_search_parameters(config['deployment_phase'])
+    print('INFO: Querying server for events matching the following criteria:\n', json.dumps(search_parameters, indent=4))
+    events = di.get_events(search=search_parameters)
+    print('INFO:', len(events), 'events were returned')
+    print('INFO: Summarizing event data by device id')
+    event_counts = di.count_data_by_field(events, 'device_id')
+
+    #collect device data
+    print('INFO: Getting device list from server')
+    devices = di.get_devices(include_deactivated=False)
+    print('INFO:', len(devices), 'devices were returned')
     print('INFO: Appending deployment phase data to device list')
     for device in devices:
         for policy in policies:
             if policy['id'] == device['policy_id']:
                 device['deployment_phase'] = policy['deployment_phase']
 
-    #remove irrelevant data from devices
     print('INFO: Filtering device data to remove devices not in a phase', config['deployment_phase'], 'policy')
     filtered_devices = []
     for device in devices:
         if device['deployment_phase'] == config['deployment_phase']:
             filtered_devices.append(device)
     devices = filtered_devices
+    print('INFO:', len(devices), 'devices remain')
 
-    #calculate event counts per device and add to device data
-    print('INFO: Summarizing event data by device')
-    event_counts = di.count_data_by_field(events, 'device_id')
     print('INFO: Adding event count data to device list')
     for device in devices:
         if device['id'] not in event_counts.keys():
@@ -135,12 +137,10 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         else:
             device['event_count'] = event_counts[device['id']]
 
-    #add days_since_last_contact field to devices
     print('INFO: Calculating days since last contact and adding results to device list')
     for device in devices:
         device['last_contact_days_ago'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_contact'])).days
 
-    #add ready_to_move_to_next_phase field to devices
     print('INFO: Evaluating devices to determine which are ready to progress to the next phase')
     for device in devices:
         device['ready_to_move_to_next_phase'] = False
@@ -148,7 +148,6 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
             if device['event_count'] <= int(config['max_open_event_quantity']):
                 device['ready_to_move_to_next_phase'] = True
 
-    #sort devices by category
     print('INFO: Sorting devices into list by readiness')
     devices_ready = []
     devices_not_ready = []
@@ -176,7 +175,11 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     folder_name = di.create_export_folder()
     from_deployment_phase = config['deployment_phase']
     to_deployment_phase = from_deployment_phase + 1
-    file_name = f'deployment_phase_{from_deployment_phase}_to_phase_{to_deployment_phase}_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC_{di.fqdn.split(".",1)[0]}.xlsx'
+    if di.is_server_multitenancy_enabled():
+        server_shortname = re.sub(r'[^a-z0-9]','',policies[0]['msp_name'].lower())
+    else:
+        server_shortname = di.fqdn.split(".",1)[0]
+    file_name = f'deployment_phase_{from_deployment_phase}_to_phase_{to_deployment_phase}_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC_{server_shortname}.xlsx'
 
     #export dataframes to Excel format
     print('INFO: Exporting dataframes to disk')

@@ -1318,3 +1318,11 @@ def add_allow_list_hashes(hash_list, policy_id, delete=False):
 
 def remove_allow_list_hashes(hash_list, policy_id):
     return add_allow_list_hashes(hash_list, policy_id, delete=True)
+
+def is_server_multitenancy_enabled():
+    request_url = f'https://{fqdn}/api/v1/multitenancy/msp'
+    response = requests.get(request_url)
+    if response.status_code == 404:
+        return False
+    else:
+        return True
