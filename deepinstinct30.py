@@ -1291,7 +1291,7 @@ def add_process_exclusion(exclusion, comment, policy_id, exclusion_type='process
 def add_folder_exclusion(exclusion, comment, policy_id):
     return add_process_exclusion(exclusion=exclusion, comment=comment, policy_id=policy_id, exclusion_type='folder_path')
 
-def add_allow_list_hashes(hash_list, policy_id):
+def add_allow_list_hashes(hash_list, policy_id, delete=False):
     request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/hashes'
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
 
@@ -1301,10 +1301,20 @@ def add_allow_list_hashes(hash_list, policy_id):
         item_list.append(item)
     payload = {'items': item_list}
 
-    response = requests.post(request_url, headers=headers, json=payload)
+    if not delete:
+        response = requests.post(request_url, headers=headers, json=payload)
+    else:
+        response = requests.delete(request_url, headers=headers, json=payload)
+
     if response.status_code == 204:
-        print('Successfully added', len(hash_list), 'hashes to allow list for policy', policy_id)
+        if not delete:
+            print('Successfully added', len(hash_list), 'hashes to allow list for policy', policy_id)
+        else:
+            print('Successfully removed', len(hash_list), 'hashes from allow list for policy', policy_id)
         return True
     else:
         print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
         return False
+
+def remove_allow_list_hashes(hash_list, policy_id):
+    return add_allow_list_hashes(hash_list, policy_id, delete=True)
