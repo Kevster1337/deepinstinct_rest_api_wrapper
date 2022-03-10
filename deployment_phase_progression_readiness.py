@@ -188,7 +188,8 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         devices_not_ready_df.to_excel(writer, sheet_name='not_ready_for_next_phase', index=False)
         config_df.to_excel(writer, sheet_name='config', index=False)
         search_parameters_df.to_excel(writer, sheet_name='event_search_criteria', index=False)
-    print('Results of this analysis were experted to disk as', f'{folder_name}/{file_name}')
+    print(f'{folder_name}\\{file_name}')
+    print('Done.')
 
 
 def main():
