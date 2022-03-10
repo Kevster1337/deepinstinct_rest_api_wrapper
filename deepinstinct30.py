@@ -1291,13 +1291,13 @@ def add_process_exclusion(exclusion, comment, policy_id, exclusion_type='process
 def add_folder_exclusion(exclusion, comment, policy_id):
     return add_process_exclusion(exclusion=exclusion, comment=comment, policy_id=policy_id, exclusion_type='folder_path')
 
-def add_allow_list_hashes(hash_list, policy_id, delete=False):
+def add_allow_list_hashes(hash_list, policy_id, comment='', delete=False):
     request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/hashes'
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
 
     item_list = []
     for hash in hash_list:
-        item = {'item': hash, 'comment': ' '}
+        item = {'item': hash, 'comment': comment}
         item_list.append(item)
     payload = {'items': item_list}
 
@@ -1326,3 +1326,12 @@ def is_server_multitenancy_enabled():
         return False
     else:
         return True
+
+def remove_all_allow_list_hashes():
+    policies = get_policies(include_allow_deny_lists=True, keep_data_encapsulated=True)
+    for policy in policies:
+        if len( policy['allow_deny_and_exclusion_lists']['allow-list/hashes']['items'] ) > 1:
+            hash_list = []
+            for item in policy['allow_deny_and_exclusion_lists']['allow-list/hashes']['items']:
+                hash_list.append(item['item'])
+            remove_allow_list_hashes(hash_list, policy['id'])
