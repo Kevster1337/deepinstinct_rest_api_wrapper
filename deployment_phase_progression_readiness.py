@@ -141,6 +141,11 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     for device in devices:
         device['last_contact_days_ago'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_contact'])).days
 
+    #add days_since_deployment field to devices
+    print('INFO: Adding days_since_deployment to device data by comparing last_registration to current datetime')
+    for device in devices:
+        device['days_since_deployment'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_registration'])).days
+
     print('INFO: Evaluating devices to determine which are ready to progress to the next phase')
     for device in devices:
         device['ready_to_move_to_next_phase'] = False
