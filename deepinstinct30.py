@@ -1257,7 +1257,7 @@ def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['W
             if list_type in policy['allow_deny_and_exclusion_lists']:
                 if len(policy['allow_deny_and_exclusion_lists'][list_type]['items']) > 0:
 
-                    #workaround to issue with null comment values
+                    #workaround to issue where entries with {'comment': None} trigger HTTP 400 error when writing data
                     if null_comment_workaround_enabled:
                         for item in policy['allow_deny_and_exclusion_lists'][list_type]['items']:
                             if 'comment' in item.keys():
