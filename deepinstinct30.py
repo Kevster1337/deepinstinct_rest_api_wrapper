@@ -1208,7 +1208,7 @@ def add_hashes_to_deny_list(hash_list, policy_id=0, all_policies=False, platform
         return True
 
 # Method to copy policies from one MSP to another on a multi-tenancy server
-def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['WINDOWS', 'MAC'], allow_deny_and_exclusion_list_types = ['allow-list/hashes', 'allow-list/paths', 'allow-list/certificates', 'allow-list/process_paths', 'allow-list/scripts', 'deny-list/hashes', 'exclusion-list/folder_path', 'exclusion-list/process_path'] ):
+def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['WINDOWS', 'MAC'], allow_deny_and_exclusion_list_types = ['allow-list/hashes', 'allow-list/paths', 'allow-list/certificates', 'allow-list/process_paths', 'allow-list/scripts', 'deny-list/hashes', 'exclusion-list/folder_path', 'exclusion-list/process_path'] , null_comment_workaround_enabled=True):
 
     #get policies from each of the MSPs
     source_msp_policies = get_policies(include_policy_data=True, keep_data_encapsulated=True, include_allow_deny_lists=True, msp_id=source_msp_id)
@@ -1256,6 +1256,14 @@ def migrate_policies(source_msp_id, destination_msp_id, platforms_to_migrate=['W
         for list_type in allow_deny_and_exclusion_list_types:
             if list_type in policy['allow_deny_and_exclusion_lists']:
                 if len(policy['allow_deny_and_exclusion_lists'][list_type]['items']) > 0:
+
+                    #workaround to issue with null comment values
+                    if null_comment_workaround_enabled:
+                        for item in policy['allow_deny_and_exclusion_lists'][list_type]['items']:
+                            if 'comment' in item.keys():
+                                if item['comment'] == None:
+                                    item['comment'] = ''
+
                     payload = policy['allow_deny_and_exclusion_lists'][list_type]
                     request_url = f'https://{fqdn}/api/v1/policies/{new_policy_id}/{list_type}'
                     response = requests.post(request_url, headers=headers, json=payload)
