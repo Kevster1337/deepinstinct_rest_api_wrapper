@@ -9,13 +9,14 @@
 # and recreate the problem with a reproducible test case against the raw/pure
 # DI REST API.
 #
+
+#import time
 #start_time = time.perf_counter()
 
 
 # -- IMPORT LIBRARIES --
 import deepinstinct30 as di
 import pandas
-import time
 
 
 # -- CONFIGURATION --
@@ -31,33 +32,75 @@ folder_exclusions_file_name = 'folder_exclusions.xlsx'
 
 # -- RUNTIME --
 
-#read exclusions from files on disk
+#read exclusions from files on disk as Pandas dataframes
 process_exclusions_dataframe = pandas.read_excel(process_exclusions_file_name)
 folder_exclusions_dataframe = pandas.read_excel(folder_exclusions_file_name)
 
-#convert each to a list of dictionaries
+#replace any null values with empty string to avoid subsequent errors
+process_exclusions_dataframe.fillna('', inplace=True)
+folder_exclusions_dataframe.fillna('', inplace=True)
+
+#convert Pandas dataframes to Python dictionaries
 process_exclusions = process_exclusions_dataframe.to_dict('records')
 folder_exclusions = folder_exclusions_dataframe.to_dict('records')
 
-#get policies
+#get policy list, then filter it to get a list of just Windows policies
 all_policies = di.get_policies()
-
-#filter policy list (Static Analysis exclusions are a Windows-only feature)
 windows_policies = []
 for policy in all_policies:
     if policy['os'] == 'WINDOWS':
         windows_policies.append(policy)
 
-#iterate through the Windows policies and add the exclusions to each
+#iterate through each of the Windows policies
 for policy in windows_policies:
 
-    print('INFO: Adding', len(process_exclusions), 'process exclusions to policy', policy['id'], policy['name'])
-    for exclusion in process_exclusions:
-        di.add_process_exclusion(exclusion['Process'], exclusion['Comment'], policy['id'])
+    print('INFO: Beginning processing of policy', policy['id'], policy['name'])
 
-    print('INFO: Adding', len(folder_exclusions), 'folder exclusions to policy', policy['id'], policy['name'])
+
+    #PROCESS EXCLUSIONS
+
+    #create a list to store process exclusions that apply to this policy
+    process_exclusions_this_policy = []
+
+    #iterate though the imported process exclusion list
+    for exclusion in process_exclusions:
+        #check if the exclusion applies to all policies
+        if exclusion['Policies'] == 'All':
+            process_exclusions_this_policy.append(exclusion)
+        #check if the exclusion applies to this specific policy
+        elif policy['name'] in exclusion['Policies']:
+            process_exclusions_this_policy.append(exclusion)
+
+    #if we found some exclusions applicable to this policy, create them
+    if len(process_exclusions_this_policy) > 0:
+        print('INFO: Adding', len(process_exclusions_this_policy), 'process exclusions to policy', policy['id'], policy['name'])
+        for exclusion in process_exclusions_this_policy:
+            di.add_process_exclusion(exclusion['Process'], exclusion['Comment'], policy['id'])
+
+
+    #FOLDER EXCLUSIONS
+
+    #create a list to store folder exclusions that apply to this policy
+    folder_exclusions_this_policy = []
+
+    #iterate though the imported folder exclusion list
     for exclusion in folder_exclusions:
-        di.add_folder_exclusion(exclusion['Folder'], exclusion['Comment'], policy['id'])
+        #check if the exclusion applies to all policies
+        if exclusion['Policies'] == 'All':
+            folder_exclusions_this_policy.append(exclusion)
+        #check if the exclusion applies to this specific policy
+        elif policy['name'] in exclusion['Policies']:
+            folder_exclusions_this_policy.append(exclusion)
+
+    #if we found some exclusions applicable to this policy, create them
+    if len(folder_exclusions_this_policy) > 0:
+        print('INFO: Adding', len(folder_exclusions_this_policy), 'folder exclusions to policy', policy['id'], policy['name'])
+        for exclusion in folder_exclusions_this_policy:
+            di.add_folder_exclusion(exclusion['Folder'], exclusion['Comment'], policy['id'])
+
+
+    print('INFO: Done with policy', policy['id'], policy['name'])
+
 
 #runtime_in_seconds = time.perf_counter() - start_time
-#print('The above code took a total of', runtime_in_seconds, 'seconds to run')
+#print('Runtime was', runtime_in_seconds, 'seconds.')
