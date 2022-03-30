@@ -10,6 +10,34 @@
 # DI REST API.
 #
 
+# -- USAGE NOTES ---
+
+# This script accepts a pair of input files. One for Folder Exclusions and one
+# for Process Exclusions. Both input files should be single sheet (tab) OOXML
+# spreadsheets.
+#
+# The process exclusions input file must contain the following columns. Column
+# names are cASE seNSITive. Column order is irrelevant. Additional columns will
+# be ignored.
+#   Comment
+#   Policies
+#   Process
+#
+# The folder exclusions input file must contain the following columns. Column
+# names are cASE seNSITive. Column order is irrelevant. Additional columns will
+# be ignored.
+#   Comment
+#   Policies
+#   Folder
+#
+# The Policies column can contain a single policy name, a list of policy names
+# with any delimiter of your choice (I suggest commas), or the word All (cASE
+# seNSITive).
+#
+# This input file syntax is identical to what is created if you use the GUI to
+# export the exclusion lists. I suggest to take an export and then use that as
+# your template.
+
 #import time
 #start_time = time.perf_counter()
 
