@@ -31,9 +31,10 @@
 #   Folder
 #
 # The Policies column must contain exactly one of the following:
-#   A policy name
+#   The word All
+#   The name of one policy
 #   A list of policies delimited by <comma><space>. Example: Policy 1, Policy 2
-#   The word All (cASE seNSITive)
+# Note: All of the above are cASE seNSITive
 #
 # This input file syntax is identical to what is created if you use the GUI to
 # export the exclusion lists. I suggest to take an export and then use that as
