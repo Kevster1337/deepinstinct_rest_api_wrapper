@@ -45,13 +45,28 @@ for device in devices:
 
 # Process the list of devices which were identified for removal
 for device in devices_to_remove:
-    print('Requesting removal of device', )
+
+    print('Requesting removal of device', device['id'])
     removal_status = di.remove_device(device)
     if removal_status:
-        print(device['id'], device['hostname'], 'was successfully removed')
+        print('INFO:', device['id'], device['hostname'], 'was successfully removed')
     else:
-        print('Failed to remove', device['id'], device['hostname'])
+        print('ERROR: Failed to remove', device['id'], device['hostname'])
 
+# OPTIONAL - uncomment the block of code below to also archive the devices. Use
+# this feature with caution since it can result in unwanted side effects if
+# any of these devices come back online at any point.
+#
+# device_ids_to_archive = []
+# for device in devices_to_remove:
+#     device_ids_to_archive.append(device['id'])
+# print('Requesting archival of,' len(device_ids_to_archive), 'devices:')
+# print(device_ids_to_archive)
+# archival_status = di.archive_devices(device_ids_to_archive)
+# if archival_status:
+#     print('INFO: Successfully archived', len(device_ids_to_archive), 'devices.')
+# else:
+#     print('ERROR: Failed to archive the devices.')
 
 
 # Disclaimer:
