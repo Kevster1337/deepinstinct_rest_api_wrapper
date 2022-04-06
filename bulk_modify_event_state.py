@@ -64,7 +64,7 @@ def get_event_ids_based_on_live_data():
     #write preview of events to be modified to disk
     filtered_events_df = pandas.DataFrame(filtered_events)
     folder_name = di.create_export_folder()
-    file_name = f'mass_modified_events_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC.xlsx'
+    file_name = f'modified_events_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC.xlsx'
     filtered_events_df.to_excel(f'{folder_name}/{file_name}', index=False)
     print('INFO:', len(filtered_events), 'events found matching defined criteria and have been written to disk as', f'{folder_name}/{file_name}. Please review before proceeding to confirm expected results.')
 
