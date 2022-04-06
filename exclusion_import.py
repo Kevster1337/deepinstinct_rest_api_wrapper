@@ -100,7 +100,7 @@ def run_exclusion_import(fqdn, key, process_exclusions_file_name, folder_exclusi
         if len(process_exclusions_this_policy) > 0:
             print('INFO: Adding', len(process_exclusions_this_policy), 'process exclusions to policy', policy['id'], policy['name'])
             for exclusion in process_exclusions_this_policy:
-                di.add_process_exclusion(exclusion['Process'], exclusion['Comment'], policy['id'])
+                di.add_process_exclusion(exclusion=exclusion['Process'], comment=exclusion['Comment'], policy_id=policy['id'])
 
 
         #FOLDER EXCLUSIONS
@@ -121,7 +121,7 @@ def run_exclusion_import(fqdn, key, process_exclusions_file_name, folder_exclusi
         if len(folder_exclusions_this_policy) > 0:
             print('INFO: Adding', len(folder_exclusions_this_policy), 'folder exclusions to policy', policy['id'], policy['name'])
             for exclusion in folder_exclusions_this_policy:
-                di.add_folder_exclusion(exclusion['Folder'], exclusion['Comment'], policy['id'])
+                di.add_folder_exclusion(exclusion=exclusion['Folder'], comment=exclusion['Comment'], policy_id=policy['id'])
 
 
         print('INFO: Done with policy', policy['id'], policy['name'])
