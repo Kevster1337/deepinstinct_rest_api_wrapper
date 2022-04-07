@@ -1374,3 +1374,12 @@ def remove_all_allow_list_hashes():
             for item in policy['allow_deny_and_exclusion_lists']['allow-list/hashes']['items']:
                 hash_list.append(item['item'])
             remove_allow_list_hashes(hash_list, policy['id'])
+
+#Archives (hides from GUI and API) a single device
+def archive_device(device, device_id_only=False):
+    if device_id_only:
+        device_id = device
+    else:
+        device_id = device['id']
+    device_ids = [device_id]
+    return archive_devices(device_ids)
