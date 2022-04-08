@@ -1383,3 +1383,26 @@ def archive_device(device, device_id_only=False):
         device_id = device['id']
     device_ids = [device_id]
     return archive_devices(device_ids)
+
+#returns first (lowest device id) device ID matching a single hostname; excludes deactivated devices
+def get_device_id(hostname):
+    headers = {'accept': 'application/json', 'Authorization': key}
+    last_id = 0
+    while last_id != None:
+        request_url = f'https://{fqdn}/api/v1/devices?after_device_id={last_id}'
+        response = requests.get(request_url, headers=headers)
+        if response.status_code == 200:
+            response = response.json()
+            if 'devices' in response:
+                for device in response['devices']:
+                    if device['license_status'] == 'ACTIVATED' and device['hostname'].lower() == hostname.lower():
+                        return device['id']
+            if 'last_id' in response:
+                last_id = response['last_id']
+            else:
+                last_id = None
+        else:
+            print('Unexpected return code', response.status_code, 'on GET', request_url, 'with headers', headers)
+            sleep(10)
+    #no match found
+    return 0
