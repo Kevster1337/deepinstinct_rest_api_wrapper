@@ -6,16 +6,18 @@
 # for identifying offline non-persistent VDI devices which are consuming a
 # license. When matches are found, it then requests an uninstall of those
 # devices. This results in the Deployment Status on those devices moving to
-# Pending Uninstall, which immediately releases the license(s) consumed.
+# Pending Uninstall, which immediately releases the license(s) consumed and
+# hides the devices from the Dashboard and any views or queries that display
+# only devices with an activated license.
 
 import deepinstinct30 as di, datetime
 
 # Server configuration
-di.fqdn = 'SERVER-NAME.customers.deepinstinctweb.com'
-di.key = 'API-KEY'
+di.fqdn = 'FOO.customers.deepinstinctweb.com'
+di.key = 'BAR'
 
 # Get device data from DI server
-devices = di.get_devices()
+devices = di.get_devices(include_deactivated=False)
 
 # Get current time and store as variable
 now = datetime.datetime.utcnow()
@@ -32,42 +34,28 @@ for device in devices:
     if 'tag' in device:   #needed to avoid KeyError for devices with no tag
         if device['tag'] == 'Your VDI Device Tag': #substitute actual device tag that you use for VDI devices
             if device['group_name'] == 'Your VDI Device Group Name':  #substitute actual group name for your VDI devices
-                if device['license_status'] == 'ACTIVATED': #only include devices consuming a license
-                    if device['connectivity_status'] == 'OFFLINE': #only include offline devices
-                        if device['deployment_status'] == 'REGISTERED': #filtering on registered avoids duplicate requests
-                            #convert last_contact form server to a Python datetime object
-                            last_contact = datetime.datetime.fromisoformat(device['last_contact'].replace('Z',''))
-                            #check if device's last_contact is long enough ago to meet criteria
-                            #you can customize the timedelta below (default 12 hours)
-                            if (now - last_contact) > datetime.timedelta(hours=12):
-                                #all criteria above were met, therefore adding current device to the removal list
-                                devices_to_remove.append(device)
+                if device['connectivity_status'] == 'OFFLINE': #only include offline devices
+                    if device['deployment_status'] == 'REGISTERED': #filtering on registered avoids duplicate requests
+                        #convert last_contact form server to a Python datetime object
+                        last_contact = datetime.datetime.fromisoformat(device['last_contact'].replace('Z',''))
+                        #check if device's last_contact is long enough ago to meet criteria
+                        #you can customize the timedelta below (default 12 hours)
+                        if (now - last_contact) > datetime.timedelta(hours=12):
+                            #all criteria above were met, therefore adding current device to the removal list
+                            devices_to_remove.append(device)
 
 # Process the list of devices which were identified for removal
 for device in devices_to_remove:
+    print('Removing device', device['id'], device['hostname'])
+    di.remove_device(device)
+    #di.archive_device(device)
 
-    print('Requesting removal of device', device['id'])
-    removal_status = di.remove_device(device)
-    if removal_status:
-        print('INFO:', device['id'], device['hostname'], 'was successfully removed')
-    else:
-        print('ERROR: Failed to remove', device['id'], device['hostname'])
-
-# OPTIONAL - uncomment the block of code below to also archive the devices. Use
-# this feature with caution since it can result in unwanted side effects if
-# any of these devices come back online at any point.
-#
-# device_ids_to_archive = []
-# for device in devices_to_remove:
-#     device_ids_to_archive.append(device['id'])
-# print('Requesting archival of,' len(device_ids_to_archive), 'devices:')
-# print(device_ids_to_archive)
-# archival_status = di.archive_devices(device_ids_to_archive)
-# if archival_status:
-#     print('INFO: Successfully archived', len(device_ids_to_archive), 'devices.')
-# else:
-#     print('ERROR: Failed to archive the devices.')
-
+# OPTIONAL - uncomment the line of code above to archive (hide from GUI and API)
+# the devices in addition to requesting an uninstall. This can be advantegous
+# if you want to completely hide the devices from all views in the GUI (even
+# those with zero filters), but it has a negative effect of also hiding any
+# associated events. Additionally, if a device is erroneously archived it does
+# not get automatically un-archived if it reconnects as of 3.3.
 
 # Disclaimer:
 # This code is provided as an example of how to build code against and interact
