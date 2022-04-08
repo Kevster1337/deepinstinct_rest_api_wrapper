@@ -1403,6 +1403,6 @@ def get_device_id(hostname):
                 last_id = None
         else:
             print('Unexpected return code', response.status_code, 'on GET', request_url, 'with headers', headers)
-            sleep(10)
+            time.sleep(10)
     #no match found
     return 0
