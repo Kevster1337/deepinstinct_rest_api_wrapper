@@ -9,9 +9,7 @@ di.key = 'BAR'
 last_id = 0
 
 while True:
-
     events = di.get_events(minimum_event_id=last_id)
-
     for event in events:
 
         #TODO: Insert code here to ingest data in SIEM, generate e-mail, or take
@@ -21,5 +19,4 @@ while True:
 
         if event['id'] > last_id:
             last_id = event['id']
-
     time.sleep(300) #wait 5 minutes, then query server again for new events
