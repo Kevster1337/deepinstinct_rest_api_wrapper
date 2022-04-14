@@ -5,9 +5,7 @@ di.fqdn = 'FOO.customers.deepinstinctweb.com'
 di.key = 'BAR'
 
 #runtime
-
 last_id = 0
-
 while True:
     events = di.get_events(minimum_event_id=last_id)
     for event in events:
