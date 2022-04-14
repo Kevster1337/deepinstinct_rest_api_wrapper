@@ -41,6 +41,7 @@ while True:
 
         else:
             print('ERROR: Unexpected return code', response.status_code, 'on GET', request_url)
+            time.sleep(15)
 
 
     print('INFO: Sleeping for 5 minutes')
