@@ -1406,3 +1406,71 @@ def get_device_id(hostname):
             time.sleep(10)
     #no match found
     return 0
+
+#returns list of Administrator Accounts
+def get_users():
+    headers = {'accept': 'application/json', 'Authorization': key}
+    request_url = f'https://{fqdn}/api/v1/users/'
+    response = requests.get(request_url, headers=headers)
+    if response.status_code == 200:
+        users = response.json()
+        return users
+
+#exports a list of Administator Accounts to Excel format
+def export_users():
+    users = get_users()
+    users_df = pandas.DataFrame(users)
+    folder_name = create_export_folder()
+    timestamp = datetime.datetime.today().strftime('%Y-%m-%d_%H.%M')
+    file_name = f'users_{timestamp}_{fqdn.split(".",1)[0]}.xlsx'
+    users_df.to_excel(f'{folder_name}/{file_name}', index=False)
+    print (f'INFO: {str(len(users))} users exported to {folder_name}/{file_name}')
+
+#creates a user
+def create_user(username, password, first_name='First', last_name='Last', email='user@domain.com', role='MASTER_ADMINISTRATOR'):
+    headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
+    payload = {'first_name': first_name, 'last_name': last_name, 'email': email,
+                'username': username, 'role': role, 'password': password,
+                'auth_type': 'LOCAL'}
+    request_url = f'https://{fqdn}/api/v1/users/'
+    response = requests.post(request_url, json=payload, headers=headers)
+    if response.status_code == 200:
+        print('INFO: Successfully created user\n', json.dumps(response.json(), indent=4))
+    elif response.status_code == 409:
+        print('ERROR: Username', username, 'already exists')
+    elif response.status_code == 403:
+        print('ERROR: MSP related user cannot create a HUB_ADMIN user / Given tenant_id doesn’t match the controller’s tenant_ids')
+    elif response.status_code == 400:
+        print('ERROR: MSP related user request shouldn’t contain msp_id / MSP ID should be supplied for creating MSP related user (relevant for hub level account admins) / Selected Role is not TENANT_VIEWER so tenant_id is redundant / Request can contain either msp_id or tenant_id, not both / Selected Role is not MSP related so msp_id is redundant / Selected role can not be created in a non-multitenancy environment')
+    else:
+        print('ERROR: Unexpected return code', response.status_code, 'on POST', request_url, 'with headers', headers)
+
+#deletes a user
+def delete_user(user):
+    headers = {'accept': 'application/json', 'Authorization': key}
+    request_url = f'https://{fqdn}/api/v1/users/{user["id"]}'
+    response = requests.delete(request_url, headers=headers)
+    if response.status_code == 204:
+        print('INFO: User', user['id'], user['username'], 'deleted')
+    elif response.status_code == 404:
+        print('ERROR: User', user['id'], 'not found')
+    else:
+        print('ERROR: Unexpected return code', response.status_code, 'on DELETE', request_url, 'with headers', headers)
+
+#modify role (permission level) on an existing user
+def change_user_role(username, new_role='READ_ONLY'):
+    all_users = get_users()
+    for user in all_users:
+        if user['username'] == username:
+            headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
+            request_url = f'https://{fqdn}/api/v1/users/{user["id"]}'
+            payload = {'first_name': user['first_name'], 'last_name': user['last_name'], 'email': user['email'], 'role': new_role}
+            response = requests.put(request_url, json=payload, headers=headers)
+            if response.status_code == 204:
+                print('INFO: User', user['id'], user['username'], 'updated to new role', new_role)
+            elif response.status_code == 404:
+                print('ERROR: User', user['id'], 'not found')
+            else:
+                print('ERROR: Unexpected return code', response.status_code, 'on PUT', request_url, 'with headers', headers, 'and payload', payload)
+            return None
+    print('ERROR: No user found with provided username', username)
