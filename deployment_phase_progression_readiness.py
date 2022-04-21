@@ -34,7 +34,7 @@ def classify_policy(policy):
                             if policy['reflective_dotnet_injection'] == 'DETECT':
                                 if policy['amsi_bypass'] == 'DETECT':
                                     if policy['credentials_dump'] == 'DETECT':
-                                        if policy['html_applications_action	'] == 'DETECT':
+                                        if policy['html_applications_action'] == 'DETECT':
                                             if policy['activescript_action'] == 'DETECT':
                                                 return 2
 
@@ -44,7 +44,7 @@ def classify_policy(policy):
                             if policy['reflective_dotnet_injection'] == 'PREVENT':
                                 if policy['amsi_bypass'] == 'PREVENT':
                                     if policy['credentials_dump'] == 'PREVENT':
-                                        if policy['html_applications_action	'] == 'PREVENT':
+                                        if policy['html_applications_action'] == 'PREVENT':
                                             if policy['activescript_action'] == 'PREVENT':
                                                 return 3
 
