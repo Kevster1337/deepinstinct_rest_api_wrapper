@@ -25,7 +25,7 @@ def classify_policy(policy):
         elif policy['prevention_level'] in ['LOW', 'MEDIUM', 'HIGH']:
 
             if policy['in_memory_protection'] == False:
-                return 2
+                return 1.5
 
             elif policy['in_memory_protection'] == True:
                 if policy['remote_code_injection'] == 'DETECT':
@@ -34,7 +34,9 @@ def classify_policy(policy):
                             if policy['reflective_dotnet_injection'] == 'DETECT':
                                 if policy['amsi_bypass'] == 'DETECT':
                                     if policy['credentials_dump'] == 'DETECT':
-                                        return 3
+                                        if policy['html_applications_action	'] == 'DETECT':
+                                            if policy['activescript_action'] == 'DETECT':
+                                                return 2
 
                 if policy['remote_code_injection'] == 'PREVENT':
                     if policy['arbitrary_shellcode_execution'] == 'PREVENT':
@@ -42,7 +44,9 @@ def classify_policy(policy):
                             if policy['reflective_dotnet_injection'] == 'PREVENT':
                                 if policy['amsi_bypass'] == 'PREVENT':
                                     if policy['credentials_dump'] == 'PREVENT':
-                                        return 4
+                                        if policy['html_applications_action	'] == 'PREVENT':
+                                            if policy['activescript_action'] == 'PREVENT':
+                                                return 3
 
     return 0
 
@@ -56,7 +60,7 @@ def get_event_search_parameters(deployment_phase):
     search_parameters['status'] = ['OPEN']
     search_parameters['threat_severity'] = ['MODERATE', 'HIGH', 'VERY_HIGH']
 
-    if deployment_phase in [1, 2]:
+    if deployment_phase in [1, 1.5]:
         search_parameters['type'] = ['STATIC_ANALYSIS']
         search_parameters['type'].append('RANSOMWARE_FILE_ENCRYPTION')
         search_parameters['type'].append('SUSPICIOUS_SCRIPT_EXCECUTION')
@@ -67,8 +71,8 @@ def get_event_search_parameters(deployment_phase):
         else:
             search_parameters['action'] = ['PREVENTED']
 
-    elif deployment_phase in [3, 4]:
-        search_parameters['action'] = ['PREVENTED']
+    elif deployment_phase in [2]:
+        search_parameters['action'] = ['PREVENTED', 'DETECTED']
         search_parameters['type'] = ['REMOTE_CODE_INJECTION_EXECUTION']
         search_parameters['type'].append('KNOWN_SHELLCODE_PAYLOADS')
         search_parameters['type'].append('ARBITRARY_SHELLCODE')
@@ -77,9 +81,6 @@ def get_event_search_parameters(deployment_phase):
         search_parameters['type'].append('AMSI_BYPASS')
         search_parameters['type'].append('DIRECT_SYSTEMCALLS')
         search_parameters['type'].append('CREDENTIAL_DUMP')
-
-        if deployment_phase == 3:
-            search_parameters['action'].append('DETECTED')
 
     return search_parameters
 
@@ -165,7 +166,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     print('INFO: Analysis is complete')
 
     #print summary to console
-    print(len(devices_ready), 'of', len(devices), 'devices are ready to move from phase', config['deployment_phase'], 'to phase', int(config['deployment_phase'])+1, 'and', len(devices_not_ready), 'devices are not based on this criteria:')
+    print(len(devices_ready), 'of', len(devices), 'devices are ready to progress beyond phase', "{:g}".format(float(config['deployment_phase'])), 'and', len(devices_not_ready), 'devices are not based on this criteria:')
     print(json.dumps(config,indent=4))
 
     #convert data to be exported to dataframes
@@ -178,13 +179,12 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     #prep for export
     print('INFO: Preparing export folder and file name')
     folder_name = di.create_export_folder()
-    from_deployment_phase = config['deployment_phase']
-    to_deployment_phase = from_deployment_phase + 1
+    from_deployment_phase = "{:g}".format(float(config['deployment_phase']))
     if di.is_server_multitenancy_enabled():
         server_shortname = re.sub(r'[^a-z0-9]','',policies[0]['msp_name'].lower())
     else:
         server_shortname = di.fqdn.split(".",1)[0]
-    file_name = f'deployment_phase_{from_deployment_phase}_to_phase_{to_deployment_phase}_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC_{server_shortname}.xlsx'
+    file_name = f'deployment_phase_{from_deployment_phase}_progression_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC_{server_shortname}.xlsx'
 
     #export dataframes to Excel format
     print('INFO: Exporting dataframes to disk')
@@ -195,6 +195,45 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         search_parameters_df.to_excel(writer, sheet_name='event_search_criteria', index=False)
     print(f'{folder_name}\\{file_name}')
     print('Done.')
+
+def print_readme_on_deployemnt_phases():
+    print("""
+-----------------
+DEPLOYMENT PHASES
+-----------------
+
+Phase 1 ("Detection")
+5 features, all in detect mode:
+-- Static Analysis (PE files ≥ Moderate)
+-- Known PUA
+-- Ransomware Behavior
+-- Suspicious Script Execution
+-- Malicious PowerShell Command Execution
+
+Phase 1.5 ("Prevention Essentials")
+All of above moves to Prevent mode.
+This phase is OPTIONAL. Most environments choose to move directly from phase 1 to phase 2.
+
+Phase 2 ("Prevention Essentials + Detection Advanced")
+All of above moves to Prevent mode.
+
+Add the following in prevent mode (it has no detect mode):
+-- In-Memory Protection --> Known Payload Execution
+
+Add the following in detect mode:
+-- In-Memory Protection --> Arbitrary Shellcode
+-- In-Memory Protection --> Remote Code Injection
+-- In-Memory Protection --> Reflective DLL Injection
+-- In-Memory Protection --> .Net Reflection
+-- In-Memory Protection --> AMSI Bypass
+-- In-Memory Protection --> Credential Dumping
+-- HTML Applications
+-- ActiveScript Execution (JavaScript & VBScript)
+
+Phase 3 ("Advanced Protection")
+All of above moves to Prevent mode. Aligns with Prescribed Security Settings:
+https://portal.deepinstinct.com/sys/document/preview/Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
+""")
 
 
 def main():
@@ -207,9 +246,10 @@ def main():
 
     config = {}
 
+    print_readme_on_deployemnt_phases()
     config['deployment_phase'] = 0
-    while config['deployment_phase'] not in (1, 2, 3, 4):
-        config['deployment_phase'] = int(input('Enter the deployment phase of the devices you want to evaluate ( 1 | 2 | 3 | 4 ): '))
+    while config['deployment_phase'] not in (1, 1.5, 2):
+        config['deployment_phase'] = float(input('Enter the deployment phase of the devices you want to evaluate for readiness to move to a subsequent phase ( 1 | 1.5 | 2 ): '))
 
     config['max_days_since_last_contact'] = input('Enter the maximum days since Last Contact for a device to be eligible to progress to the next phase, or press enter to accept the default [3]: ')
     if config['max_days_since_last_contact'] == '':
