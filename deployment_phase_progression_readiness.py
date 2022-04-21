@@ -22,7 +22,7 @@ def classify_policy(policy):
         if policy['prevention_level'] == 'DISABLED':
             return 1
 
-        elif policy['prevention_level'] in ['LOW', 'MEDIUM', 'HIGH']:
+        elif policy['prevention_level'] in ['LOW', 'MEDIUM']:
 
             if policy['in_memory_protection'] == False:
                 return 1.5
@@ -203,9 +203,8 @@ DEPLOYMENT PHASES
 -----------------
 
 Phase 1 ("Detection")
-5 features, all in detect mode:
--- Static Analysis (PE files ≥ Moderate)
--- Known PUA
+4 features, all in detect mode:
+-- Static Analysis (Threat Severity on PE files set to ≥ Moderate)
 -- Ransomware Behavior
 -- Suspicious Script Execution
 -- Malicious PowerShell Command Execution
