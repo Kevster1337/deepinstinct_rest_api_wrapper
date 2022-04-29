@@ -55,13 +55,14 @@ def classify_policy(policy):
 def get_event_search_parameters(deployment_phase):
 
     search_parameters = {}
+    search_parameters['type'] = []
 
     #static parameters for all phases
     search_parameters['status'] = ['OPEN']
     search_parameters['threat_severity'] = ['MODERATE', 'HIGH', 'VERY_HIGH']
 
     if deployment_phase in [1, 1.5]:
-        search_parameters['type'] = ['STATIC_ANALYSIS']
+        search_parameters['type'].append('STATIC_ANALYSIS')
         search_parameters['type'].append('RANSOMWARE_FILE_ENCRYPTION')
         search_parameters['type'].append('SUSPICIOUS_SCRIPT_EXCECUTION')
         search_parameters['type'].append('MALICIOUS_POWERSHELL_COMMAND_EXECUTION')
@@ -73,7 +74,7 @@ def get_event_search_parameters(deployment_phase):
 
     elif deployment_phase in [2]:
         search_parameters['action'] = ['PREVENTED', 'DETECTED']
-        search_parameters['type'] = ['REMOTE_CODE_INJECTION_EXECUTION']
+        search_parameters['type'].append('REMOTE_CODE_INJECTION_EXECUTION')
         search_parameters['type'].append('KNOWN_SHELLCODE_PAYLOADS')
         search_parameters['type'].append('ARBITRARY_SHELLCODE')
         search_parameters['type'].append('REFLECTIVE_DLL')
@@ -83,6 +84,28 @@ def get_event_search_parameters(deployment_phase):
         search_parameters['type'].append('CREDENTIAL_DUMP')
 
     return search_parameters
+
+
+# Calculates search parameters for suspicious events based on current deployment phase
+def get_suspicious_event_search_parameters(deployment_phase):
+
+    suspicious_search_parameters = {}
+    suspicious_search_parameters['status'] = ['OPEN']
+    suspicious_search_parameters['file_type'] = []
+    #search_parameters['type'] = []
+
+    if deployment_phase in [1, 1.5]:
+        #no events from suspicious events list for these phases
+        suspicious_search_parameters = None
+
+    elif deployment_phase in [2]:
+        suspicious_search_parameters['action'] = ['DETECTED']
+        suspicious_search_parameters['file_type'].append('ACTIVE_SCRIPT')
+        suspicious_search_parameters['file_type'].append('HTML_APPLICATION')
+        #suspicious_search_parameters['type'].append('SCRIPT_CONTROL_COMMAND')
+        #suspicious_search_parameters['type'].append('SCRIPT_CONTROL_PATH')
+
+    return suspicious_search_parameters
 
 
 def run_deployment_phase_progression_readiness(fqdn, key, config):
@@ -107,9 +130,24 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     #collect event data
     print('INFO: Calculating event search parameters')
     search_parameters = get_event_search_parameters(config['deployment_phase'])
+
+    if not config['ignore_suspicious_events']:
+        print('INFO: Calculating suspicious event search parameters')
+        suspicious_search_parameters = get_suspicious_event_search_parameters(config['deployment_phase'])
+
     print('INFO: Querying server for events matching the following criteria:\n', json.dumps(search_parameters, indent=4))
     events = di.get_events(search=search_parameters)
     print('INFO:', len(events), 'events were returned')
+
+    if not config['ignore_suspicious_events']:
+        if suspicious_search_parameters != None:
+            print('INFO: Querying server for suspicious events matching the following criteria:\n', json.dumps(suspicious_search_parameters, indent=4))
+            suspicious_events = di.get_suspicious_events(search=suspicious_search_parameters)
+            print('INFO:', len(suspicious_events), 'suspicious events were returned')
+            events = events + suspicious_events
+
+    print('INFO:', len(events), 'total events were returned')
+
     print('INFO: Summarizing event data by device id')
     event_counts = di.count_data_by_field(events, 'device_id')
 
@@ -257,6 +295,14 @@ def main():
     config['max_open_event_quantity'] = input('Enter the maximum number of Open Events for a device to be eligible to progress to the next phase, or press enter to accept the default [0]: ')
     if config['max_open_event_quantity'] == '':
         config['max_open_event_quantity'] = 0
+
+    config['ignore_suspicious_events'] = ''
+    while config['ignore_suspicious_events'] not in [True, False]:
+        user_input = input('Ignore data from the Suspicious Events list? Enter YES or NO, or press enter to accept the default [YES]: ')
+        if user_input.lower() in ['yes', '']:
+            config['ignore_suspicious_events'] = True
+        elif user_input.lower() == 'no':
+            config['ignore_suspicious_events'] = False
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)
 

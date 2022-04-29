@@ -578,6 +578,20 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
         try:
             #make request to server, store response
             response = requests.post(request_url, headers=headers, json=search, timeout=30)
+            if response.status_code == 200:
+                #store the returned last_id value
+                minimum_event_id = response.json()['last_id']
+
+                #print result to console
+                print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
+
+                #if we got a none-null last_id back
+                if minimum_event_id != None:
+                    #then extract the events
+                    events = response.json()['events']
+                    #append the event(s) from this response to collected_events
+                    for event in events:
+                        collected_events.append(event)
         except requests.exceptions.RequestException:
             print('WARNING: Exception on', request_url, '. Will sleep for 10 seconds and try again.')
             time.sleep(10)
