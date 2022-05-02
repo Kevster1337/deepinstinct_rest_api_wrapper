@@ -61,6 +61,9 @@ def get_event_search_parameters(deployment_phase):
     search_parameters['status'] = ['OPEN']
     search_parameters['threat_severity'] = ['MODERATE', 'HIGH', 'VERY_HIGH']
 
+    #example of how to focus just on a specific timeframe worth of events
+    #search_parameters['timestamp'] = {'from': '2022-04-24T00:00:00.000Z', 'to': '2022-05-03T00:00:00.000Z'}
+
     if deployment_phase in [1, 1.5]:
         search_parameters['type'].append('STATIC_ANALYSIS')
         search_parameters['type'].append('RANSOMWARE_FILE_ENCRYPTION')
@@ -93,6 +96,9 @@ def get_suspicious_event_search_parameters(deployment_phase):
     suspicious_search_parameters['status'] = ['OPEN']
     suspicious_search_parameters['file_type'] = []
     #search_parameters['type'] = []
+
+    #example of how to focus just on a specific timeframe worth of events
+    #suspicious_search_parameters['timestamp'] = {'from': '2022-04-24T00:00:00.000Z', 'to': '2022-05-03T00:00:00.000Z'}
 
     if deployment_phase in [1, 1.5]:
         #no events from suspicious events list for these phases
