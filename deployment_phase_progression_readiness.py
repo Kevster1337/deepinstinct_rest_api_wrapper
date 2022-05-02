@@ -20,33 +20,35 @@ def classify_policy(policy):
     if policy['os'] == 'WINDOWS':
 
         if policy['prevention_level'] == 'DISABLED':
-            return 1
+            if policy['detection_level'] in ['LOW', 'MEDIUM']:
+                if policy['ransomware_behavior'] == 'DETECT':
+                    return 1
 
         elif policy['prevention_level'] in ['LOW', 'MEDIUM']:
+            if policy['ransomware_behavior'] == 'PREVENT':
+                if policy['in_memory_protection'] == False:
+                    return 1.5
 
-            if policy['in_memory_protection'] == False:
-                return 1.5
+                elif policy['in_memory_protection'] == True:
+                    if policy['remote_code_injection'] == 'DETECT':
+                        if policy['arbitrary_shellcode_execution'] == 'DETECT':
+                            if policy['reflective_dll_loading'] == 'DETECT':
+                                if policy['reflective_dotnet_injection'] == 'DETECT':
+                                    if policy['amsi_bypass'] == 'DETECT':
+                                        if policy['credentials_dump'] == 'DETECT':
+                                            if policy['html_applications_action'] == 'DETECT':
+                                                if policy['activescript_action'] == 'DETECT':
+                                                    return 2
 
-            elif policy['in_memory_protection'] == True:
-                if policy['remote_code_injection'] == 'DETECT':
-                    if policy['arbitrary_shellcode_execution'] == 'DETECT':
-                        if policy['reflective_dll_loading'] == 'DETECT':
-                            if policy['reflective_dotnet_injection'] == 'DETECT':
-                                if policy['amsi_bypass'] == 'DETECT':
-                                    if policy['credentials_dump'] == 'DETECT':
-                                        if policy['html_applications_action'] == 'DETECT':
-                                            if policy['activescript_action'] == 'DETECT':
-                                                return 2
-
-                if policy['remote_code_injection'] == 'PREVENT':
-                    if policy['arbitrary_shellcode_execution'] == 'PREVENT':
-                        if policy['reflective_dll_loading'] == 'PREVENT':
-                            if policy['reflective_dotnet_injection'] == 'PREVENT':
-                                if policy['amsi_bypass'] == 'PREVENT':
-                                    if policy['credentials_dump'] == 'PREVENT':
-                                        if policy['html_applications_action'] == 'PREVENT':
-                                            if policy['activescript_action'] == 'PREVENT':
-                                                return 3
+                    if policy['remote_code_injection'] == 'PREVENT':
+                        if policy['arbitrary_shellcode_execution'] == 'PREVENT':
+                            if policy['reflective_dll_loading'] == 'PREVENT':
+                                if policy['reflective_dotnet_injection'] == 'PREVENT':
+                                    if policy['amsi_bypass'] == 'PREVENT':
+                                        if policy['credentials_dump'] == 'PREVENT':
+                                            if policy['html_applications_action'] == 'PREVENT':
+                                                if policy['activescript_action'] == 'PREVENT':
+                                                    return 3
 
     return 0
 
@@ -304,10 +306,10 @@ def main():
 
     config['ignore_suspicious_events'] = ''
     while config['ignore_suspicious_events'] not in [True, False]:
-        user_input = input('Ignore data from the Suspicious Events list? Enter YES or NO, or press enter to accept the default [YES]: ')
-        if user_input.lower() in ['yes', '']:
+        user_input = input('Ignore data from the Suspicious Events list? Enter YES or NO, or press enter to accept the default [NO]: ')
+        if user_input.lower() == 'yes':
             config['ignore_suspicious_events'] = True
-        elif user_input.lower() == 'no':
+        elif user_input.lower() in ['no', '']:
             config['ignore_suspicious_events'] = False
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)
