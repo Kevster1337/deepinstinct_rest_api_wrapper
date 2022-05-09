@@ -15,7 +15,7 @@ import deepinstinct30 as di, json, datetime, pandas, re
 from dateutil import parser
 
 # Calculates deployment phase for a Windows policy. Non-conforming and non-Windows policies return 0.
-def classify_policy(policy):
+def classify_policy(policy, config):
 
     if policy['os'] == 'WINDOWS':
 
@@ -36,8 +36,8 @@ def classify_policy(policy):
                                 if policy['reflective_dotnet_injection'] == 'DETECT':
                                     if policy['amsi_bypass'] == 'DETECT':
                                         if policy['credentials_dump'] == 'DETECT':
-                                            if policy['html_applications_action'] == 'DETECT':
-                                                if policy['activescript_action'] == 'DETECT':
+                                            if policy['html_applications_action'] == 'DETECT' or config['ignore_html_applications_action']:
+                                                if policy['activescript_action'] == 'DETECT' or config['ignore_activescript_action']:
                                                     return 2
 
                     if policy['remote_code_injection'] == 'PREVENT':
@@ -46,8 +46,8 @@ def classify_policy(policy):
                                 if policy['reflective_dotnet_injection'] == 'PREVENT':
                                     if policy['amsi_bypass'] == 'PREVENT':
                                         if policy['credentials_dump'] == 'PREVENT':
-                                            if policy['html_applications_action'] == 'PREVENT':
-                                                if policy['activescript_action'] == 'PREVENT':
+                                            if policy['html_applications_action'] == 'PREVENT' or config['ignore_html_applications_action']:
+                                                if policy['activescript_action'] == 'PREVENT' or config['ignore_activescript_action']:
                                                     return 3
 
     return 0
@@ -131,7 +131,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     print('INFO: Evaluating policy data to determine deployment phase(s)')
     print('phase\t id\t name')
     for policy in policies:
-        policy['deployment_phase'] = classify_policy(policy)
+        policy['deployment_phase'] = classify_policy(policy, config)
         if policy['os'] == 'WINDOWS':
             print(policy['deployment_phase'], '\t', policy['id'], '\t', policy['name'])
 
@@ -311,6 +311,22 @@ def main():
             config['ignore_suspicious_events'] = True
         elif user_input.lower() in ['no', '']:
             config['ignore_suspicious_events'] = False
+
+    config['ignore_html_applications_action'] = ''
+    while config['ignore_html_applications_action'] not in [True, False]:
+        user_input = input('Ignore the policy setting "HTML Applications (HTA files) and JavaScript via rundll32 executions" when evaluating policies? Enter YES or NO, or press enter to accept the default [NO]: ')
+        if user_input.lower() == 'yes':
+            config['ignore_html_applications_action'] = True
+        elif user_input.lower() in ['no', '']:
+            config['ignore_html_applications_action'] = False
+
+    config['ignore_activescript_action'] = ''
+    while config['ignore_activescript_action'] not in [True, False]:
+        user_input = input('Ignore the policy setting "ActiveScript execution (JavaScript & VBScript)" when evaluating policies? Enter YES or NO, or press enter to accept the default [NO]: ')
+        if user_input.lower() == 'yes':
+            config['ignore_activescript_action'] = True
+        elif user_input.lower() in ['no', '']:
+            config['ignore_activescript_action'] = False
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)
 
