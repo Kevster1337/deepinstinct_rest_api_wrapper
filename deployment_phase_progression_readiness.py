@@ -221,6 +221,9 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     devices_not_ready_df = pandas.DataFrame(devices_not_ready)
     config_df = pandas.DataFrame(config.items())
     search_parameters_df = pandas.DataFrame(search_parameters.items())
+    if not config['ignore_suspicious_events']:
+        suspicious_search_parameters_df = pandas.DataFrame(suspicious_search_parameters.items())
+
 
     #prep for export
     print('INFO: Preparing export folder and file name')
@@ -238,7 +241,10 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         devices_ready_df.to_excel(writer, sheet_name='ready_for_next_phase', index=False)
         devices_not_ready_df.to_excel(writer, sheet_name='not_ready_for_next_phase', index=False)
         config_df.to_excel(writer, sheet_name='config', index=False)
-        search_parameters_df.to_excel(writer, sheet_name='event_search_criteria', index=False)
+        search_parameters_df.to_excel(writer, sheet_name='event_search', index=False)
+        if not config['ignore_suspicious_events']:
+            suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
+
     print(f'{folder_name}\\{file_name}')
     print('Done.')
 
