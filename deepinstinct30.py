@@ -2,7 +2,7 @@
 # Patrick Van Zandt, Principal Professional Services Engineer, Deep Instinct
 #
 # Compatibility:
-# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, 3.2.x, and 3.3.x
+# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, 3.2.x, 3.3.x, and 3.4.x
 # -Written and tested using a Python 3.8.3 instance installed by Anaconda
 #
 # Suggested Usage:
@@ -303,8 +303,7 @@ def get_devices(include_deactivated=True):
     return collected_devices
 
 
-# Translates a list of device names, regex patterns, or CIDRs to a list of
-# device IDs
+# Translates a list of device names, regex patterns, or CIDRs to a list of device IDs
 def get_device_ids(search_list, regex_hostname_search=False, cidr_search=False):
     # GET ALL DEVICES
     devices = get_devices(include_deactivated=False)
