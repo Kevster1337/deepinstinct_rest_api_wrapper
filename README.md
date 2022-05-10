@@ -3,10 +3,10 @@
 Deep Instinct REST API Wrapper
 
 Compatibility:
-* deepinstinct30 - Designed for and tested using Deep Instinct D-Appliance version 3.0.0.0
+* deepinstinct30 - Designed for and tested using Deep Instinct D-Appliance version 3.x
 * deepinstinct25 - Designed for and tested using Deep Instinct D-Appliance version 2.5.0.1
 * deepinstinctagentless - Designed for and tested against Deep Instinct Agentless Connector version 2.3.2.0p
-* All of agove written and tested using a Python 3.8.3 instance installed by Anaconda
+* All of above written and tested using a Python 3.8.3 instance installed by Anaconda
 
 Suggested Usage:
 
