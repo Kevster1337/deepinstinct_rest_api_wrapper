@@ -28,7 +28,7 @@
 debug_mode = False
 
 # Import various libraries used by one or more method below.
-import requests, json, datetime, pandas, re, ipaddress, time, os
+import requests, json, datetime, pandas, re, ipaddress, time, os, hashlib
 #If any of the above throw import errors, try running 'pip install library_name'
 #If that doesn't fix the problem I recommend to search Google for the error
 #that you are getting.
@@ -1487,3 +1487,19 @@ def change_user_role(username, new_role='READ_ONLY'):
                 print('ERROR: Unexpected return code', response.status_code, 'on PUT', request_url, 'with headers', headers, 'and payload', payload)
             return None
     print('ERROR: No user found with provided username', username)
+
+def set_uninstall_password(policy_id, new_password):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.get(request_url, headers=headers)
+    policy_data = response.json()
+    policy_data['data']['uninstall_password_hash'] = hashlib.sha256(new_password.encode('utf-16-le')).hexdigest()
+    response = requests.put(request_url, json=policy_data, headers=headers)
+
+def set_disable_password(policy_id, new_password):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.get(request_url, headers=headers)
+    policy_data = response.json()
+    policy_data['data']['disable_password_hash'] = hashlib.sha256(new_password.encode('utf-16-le')).hexdigest()
+    response = requests.put(request_url, json=policy_data, headers=headers)
