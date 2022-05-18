@@ -659,14 +659,7 @@ def get_device(device_id):
         return None
 
 #hides a list of event ids from the GUI and REST API
-def archive_events (event_id_list, unarchive=False, suspicious=False, input_is_ids_only=True):
-
-    # if full events were provided, strip out just the ids before proceeding
-    if not input_is_ids_only:
-        event_ids = []
-        for event in event_id_list:
-            event_ids.append(event['id'])
-        event_id_list = event_ids
+def archive_events (event_id_list, unarchive=False, suspicious=False):
 
     # set headers (same for all requests in this method)
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
@@ -692,18 +685,18 @@ def archive_events (event_id_list, unarchive=False, suspicious=False, input_is_i
 
 
 #hides a list of suspicious event ids from the GUI and REST API
-def archive_suspicious_events(event_id_list, unarchive=False, input_is_ids_only=True):
+def archive_suspicious_events(event_id_list, unarchive=False):
     return archive_events(event_id_list=event_id_list, suspicious=True)
 
 
 #unhides a list of event ids from the GUI and REST API
-def unarchive_events(event_id_list, suspicious=False, input_is_ids_only=True):
-    return archive_events(event_id_list=event_id_list, unarchive=True, suspicious=suspicious, input_is_ids_only=input_is_ids_only)
+def unarchive_events(event_id_list, suspicious=False):
+    return archive_events(event_id_list=event_id_list, unarchive=True, suspicious=suspicious)
 
 
 #unhides a list of suspicious event ids from the GUI and REST API
-def unarchive_suspicious_events(event_id_list, input_is_ids_only=True):
-    return unarchive_events(event_id_list=event_id_list, suspicious=True, input_is_ids_only=input_is_ids_only)
+def unarchive_suspicious_events(event_id_list):
+    return unarchive_events(event_id_list=event_id_list, suspicious=True)
 
 
 #allows organization of exported data by server-specific folders
