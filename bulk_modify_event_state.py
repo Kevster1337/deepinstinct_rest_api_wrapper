@@ -111,7 +111,7 @@ def main():
 
     close_events = ''
     while close_events not in [True, False]:
-        user_response = input('Do you want to close these events [YES | NO]? ')
+        user_response = input('Do you want to CLOSE these events [YES | NO]? ')
         if user_response.lower() == 'yes':
             close_events = True
         elif user_response.lower() == 'no':
@@ -119,11 +119,28 @@ def main():
 
     archive_events = ''
     while archive_events not in [True, False]:
-        user_response = input('Do you want to archive these events [YES | NO]? ')
+        user_response = input('Do you want to ARCHIVE these events [YES | NO]? ')
         if user_response.lower() == 'yes':
             archive_events = True
         elif user_response.lower() == 'no':
             archive_events = False
+
+    open_events = ''
+    while open_events not in [True, False]:
+        user_response = input('Do you want to OPEN these events [YES | NO]? ')
+        if user_response.lower() == 'yes':
+            open_events = True
+        elif user_response.lower() == 'no':
+            open_events = False
+
+    unarchive_events = ''
+    while unarchive_events not in [True, False]:
+        user_response = input('Do you want to UNARCHIVE these events [YES | NO]? ')
+        if user_response.lower() == 'yes':
+            unarchive_events = True
+        elif user_response.lower() == 'no':
+            unarchive_events = False
+
 
     #break event_id_list into a list of smaller lists
     batch_size = 250
@@ -134,15 +151,23 @@ def main():
     batch_number = 1
     for batch in event_id_list_broken_into_batches:
         print('Processing batch', batch_number, 'of', len(event_id_list_broken_into_batches))
+
         if close_events:
-            #close the events
             print('  Closing', len(batch), 'events')
             di.close_events(batch)
 
         if archive_events:
-            #archive the events
             print('  Archiving', len(batch), 'events')
             di.archive_events(batch)
+
+        if open_events:
+            print('  Opening', len(batch), 'events')
+            di.open_events(batch)
+
+        if unarchive_events:
+            print('  Unarchiving', len(batch), 'events')
+            di.unarchive_events(batch)
+
         batch_number += 1
 
 
