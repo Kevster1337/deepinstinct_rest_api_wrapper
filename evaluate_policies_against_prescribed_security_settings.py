@@ -31,10 +31,10 @@ def evaluate_policies(policies):
         result['detection_level'] = check_policy_setting('MEDIUM', policy['detection_level'])
         result['prevention_level'] = check_policy_setting('MEDIUM', policy['prevention_level'])
         result['protection_level_pua'] = check_policy_setting('PREVENT', policy['protection_level_pua'])
-        result['scan_network_drives'] = check_policy_setting('true', policy['scan_network_drives'])
+        result['scan_network_drives'] = check_policy_setting('True', policy['scan_network_drives'])
         result['embedded_dde_object'] = '-manual_review-'
         result['ransomware_behavior'] = check_policy_setting('PREVENT', policy['ransomware_behavior'])
-        result['in_memory_protection'] = check_policy_setting('true', policy['in_memory_protection'])
+        result['in_memory_protection'] = check_policy_setting('True', policy['in_memory_protection'])
         result['arbitrary_shellcode_execution'] = check_policy_setting('PREVENT', policy['arbitrary_shellcode_execution'])
         result['remote_code_injection'] = check_policy_setting('PREVENT', policy['remote_code_injection'])
         result['reflective_dll_loading'] = check_policy_setting('PREVENT', policy['reflective_dll_loading'])
