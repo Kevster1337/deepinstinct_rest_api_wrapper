@@ -1496,3 +1496,92 @@ def set_disable_password(policy_id, new_password):
     policy_data = response.json()
     policy_data['data']['disable_password_hash'] = hashlib.sha256(new_password.encode('utf-16-le')).hexdigest()
     response = requests.put(request_url, json=policy_data, headers=headers)
+
+def get_behavioral_allow_lists(policy_id):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    behavioral_allow_lists = []
+    response = requests.get(request_url, headers=headers)
+    if response.status_code == 200:
+        items = response.json()['items']
+        for item in items:
+            behavioral_allow_list = {'process': item['item'], 'behavior_name_list': [], 'comment': item['comment']}
+            if 1 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('RANSOMWARE_FILE_ENCRYPTION')
+            if 2 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REMOTE_CODE_INJECTION_EXECUTION')
+            if 3 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('KNOWN_SHELLCODE_PAYLOADS')
+            if 4 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('ARBITRARY_SHELLCODE_EXECUTION')
+            if 5 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REFLECTIVE_DLL')
+            if 6 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REFLECTIVE_DOTNET')
+            if 7 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('AMSI_BYPASS')
+            if 8 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('DIRECT_SYSTEMCALLS')
+            if 9 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('CREDENTIALS_DUMP')
+            behavioral_allow_lists.append(behavioral_allow_list)
+    return behavioral_allow_lists
+
+def add_behavioral_allow_lists(policy_id, process_list, behavior_name_list, comment):
+    behavior_id_list = []
+    if 'RANSOMWARE_FILE_ENCRYPTION' in behavior_name_list:
+        behavior_id_list.append(1)
+    if 'REMOTE_CODE_INJECTION_EXECUTION' in behavior_name_list:
+        behavior_id_list.append(2)
+    if 'KNOWN_SHELLCODE_PAYLOADS' in behavior_name_list:
+        behavior_id_list.append(3)
+    if 'ARBITRARY_SHELLCODE_EXECUTION' in behavior_name_list:
+        behavior_id_list.append(4)
+    if 'REFLECTIVE_DLL' in behavior_name_list:
+        behavior_id_list.append(5)
+    if 'REFLECTIVE_DOTNET' in behavior_name_list:
+        behavior_id_list.append(6)
+    if 'AMSI_BYPASS' in behavior_name_list:
+        behavior_id_list.append(7)
+    if 'DIRECT_SYSTEMCALLS' in behavior_name_list:
+        behavior_id_list.append(8)
+    if 'CREDENTIALS_DUMP' in behavior_name_list:
+        behavior_id_list.append(9)
+
+    allow_lists_to_add = []
+    for process in process_list:
+        allow_list_item = {'item': process, 'behavior_ids': behavior_id_list, 'comment': comment}
+        allow_lists_to_add.append(allow_list_item)
+    payload = {'items': allow_lists_to_add}
+
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.post(request_url, headers=headers, json=payload)
+
+    if response.status_code == 204:
+        print('Successfully added', len(process_list), 'entries from the', behavior_name_list, 'allow lists for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload \n', json.dumps(payload, indent=4), '\n and headers \n', json.dumps(headers, indent=4))
+        return False
+
+def remove_behavioral_allow_lists(policy_id, process_list):
+    payload = {'items': []}
+    for process in process_list:
+        payload['items'].append({'item': process})
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.delete(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully removed', len(process_list), 'entries from the Behavioral Allow List for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on DELETE', request_url, 'with payload \n', json.dumps(payload, indent=4), '\n and headers \n', json.dumps(headers, indent=4))
+        return False
+
+def remove_all_behavioral_allow_lists(policy_id):
+    items = get_behavioral_allow_lists(policy_id)
+    process_list = []
+    for item in items:
+        process_list.append(item['process'])
+    remove_behavioral_allow_lists(policy_id=policy_id, process_list=process_list)
