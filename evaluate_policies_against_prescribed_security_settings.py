@@ -63,17 +63,28 @@ def calculate_export_file_name(policies):
     return file_name
 
 def export_results(results, file_name):
-
     results_df = pandas.DataFrame(results)
     results_df.to_excel(file_name, index=False)
     print('Results written to disk as', file_name, '.')
     print('Non-confirming settings are denoted by wrapping the non-confirming value in hyphens.')
     print('Some settings require manual review until/unless "FR-0000135 - Add missing Windows policy settings to Deep Instinct REST API WindowsPolicyData model" is implemented.')
 
+def add_device_counts(policy_list):
+    devices = di.get_devices(include_deactivated=False)
+    device_counts = di.count_data_by_field(devices, 'policy_id')
+    for policy in policy_list:
+        if policy['policy_id'] not in device_counts.keys():
+            policy['device_count'] = 0
+        else:
+            policy['device_count'] = device_counts[policy['policy_id']]
+    return policy_list
+
 def main():
     prompt_user_for_config()
     policies = get_windows_policies()
     results = evaluate_policies(policies)
+    if input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [NO]: ').lower() == 'yes':
+        results = add_device_counts(results)
     file_name = calculate_export_file_name(policies)
     export_results(results, file_name)
 
