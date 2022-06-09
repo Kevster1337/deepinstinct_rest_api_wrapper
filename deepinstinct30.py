@@ -1585,3 +1585,15 @@ def remove_all_behavioral_allow_lists(policy_id):
     for item in items:
         process_list.append(item['process'])
     remove_behavioral_allow_lists(policy_id=policy_id, process_list=process_list)
+
+def add_script_path_allow_list(policy_id, path, comment=''):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/scripts'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    payload = {'items': [ {'comment': comment, 'item': path} ] }
+    response = requests.post(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully added', path, 'to script path allow list for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
+        return False

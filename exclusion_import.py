@@ -25,16 +25,19 @@ def run_exclusion_import(fqdn, key, file_name):
     process_exclusions_dataframe = pandas.read_excel(file_name, sheet_name='Process')
     folder_exclusions_dataframe = pandas.read_excel(file_name, sheet_name='Folder')
     behavioral_allow_lists_dataframe = pandas.read_excel(file_name, sheet_name='Behavioral')
+    script_allow_lists_dataframe = pandas.read_excel(file_name, sheet_name='Script')
 
     #replace any null values with empty string to avoid subsequent errors
     process_exclusions_dataframe.fillna('', inplace=True)
     folder_exclusions_dataframe.fillna('', inplace=True)
     behavioral_allow_lists_dataframe.fillna('', inplace=True)
+    script_allow_lists_dataframe.fillna('', inplace=True)
 
     #convert Pandas dataframes to Python dictionaries
     process_exclusions = process_exclusions_dataframe.to_dict('records')
     folder_exclusions = folder_exclusions_dataframe.to_dict('records')
     behavioral_allow_lists = behavioral_allow_lists_dataframe.to_dict('records')
+    script_allow_lists = script_allow_lists_dataframe.to_dict('records')
 
     #convert fields expected to contain comma-separated lists from strings to lists
     for item in process_exclusions:
@@ -44,6 +47,8 @@ def run_exclusion_import(fqdn, key, file_name):
     for item in behavioral_allow_lists:
         item['Policies'] = item['Policies'].split(", ")
         item['Behaviors'] = item['Behaviors'].split(", ")
+    for item in script_allow_lists:
+        item['Policies'] = item['Policies'].split(", ")
 
     #get policy list, then filter it to get a list of just Windows policies
     all_policies = di.get_policies()
@@ -100,7 +105,7 @@ def run_exclusion_import(fqdn, key, file_name):
                 di.add_folder_exclusion(exclusion=exclusion['Folder'], comment=exclusion['Comment'], policy_id=policy['id'])
 
 
-        #BEHAVIORAL ANALYSIS
+        #BEHAVIORAL ANALYSIS ALLOW LIST
 
         #create a list to store entries that apply to this policy
         behavioral_this_policy = []
@@ -120,6 +125,28 @@ def run_exclusion_import(fqdn, key, file_name):
             for exclusion in behavioral_this_policy:
                 di.add_behavioral_allow_lists(process_list=[exclusion['Process']], behavior_name_list=exclusion['Behaviors'], comment=exclusion['Comment'], policy_id=policy['id'])
 
+
+        #SCRIPT ALLOW LIST
+
+        #create a list to store folder exclusions that apply to this policy
+        script_this_policy = []
+
+        #iterate though the imported folder exclusion list
+        for exclusion in script_allow_lists:
+            #check if the exclusion applies to all policies
+            if exclusion['Policies'] == ['All']:
+                script_this_policy.append(exclusion)
+            #check if the exclusion applies to this specific policy
+            elif policy['name'] in exclusion['Policies']:
+                script_this_policy.append(exclusion)
+
+        #if we found some exclusions applicable to this policy, create them
+        if len(script_this_policy) > 0:
+            print('INFO: Adding', len(script_this_policy), 'script allow lists to policy', policy['id'], policy['name'])
+            for exclusion in script_this_policy:
+                di.add_script_path_allow_list(path=exclusion['Path'], comment=exclusion['Comment'], policy_id=policy['id'])
+
+
         print('INFO: Done with policy', policy['id'], policy['name'])
 
     runtime_in_seconds = time.perf_counter() - start_time
@@ -134,12 +161,14 @@ three types of exclusions in bulk:
 1. Static Analysis Process Exclusions
 2. Static Analysis Folder Exclusions
 3. Behavioral Analysis Allow Lists
+4. Script Path Allow Lists
 
 The input file must be an OOXML spreadsheet (.xlsx file) and contain at minimum
-three sheets (tabs). Those sheets must be named:
+four sheets (tabs). Those sheets must be named:
 1. Process
 2. Folder
 3. Behavioral
+4. Script
 Sheet order is irrelevant. Additional sheets, if present, will be ignored.
 Sheet names are cASe SeNSITIVe. All sheets and their required column names
 detailed below must always be present, even if they contain no entries to
@@ -147,22 +176,28 @@ import.
 
 The 'Process' sheet must contain the following columns. Column names are
 cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
-1. Comment
+1. Process
 2. Policies
-3. Process
+3. Comment
 
 The 'Folder' sheet must contain the following columns. Column names are
 cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
-1. Comment
+1. Folder
 2. Policies
-3. Folder
+3. Comment
 
 The 'Behavioral' sheet must contain the following columns. Column names are
 cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
-1. Comment
+1. Process
+2. Behaviors
+3. Policies
+4. Comment
+
+The 'Script' sheet must contain the following columns. Column names are
+cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
+1. Path
 2. Policies
-3. Process
-4. Behaviors
+3. Comment
 
 For all 3 sheets, the 'Policies' column must contain one of the following:
 A. The word All
