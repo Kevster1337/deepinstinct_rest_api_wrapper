@@ -1559,7 +1559,7 @@ def add_behavioral_allow_lists(policy_id, process_list, behavior_name_list, comm
     response = requests.post(request_url, headers=headers, json=payload)
 
     if response.status_code == 204:
-        print('Successfully added', len(process_list), 'entries from the', behavior_name_list, 'allow lists for policy', policy_id)
+        print('Successfully added', len(process_list), 'entries to the', behavior_name_list, 'allow lists for policy', policy_id)
         return True
     else:
         print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload \n', json.dumps(payload, indent=4), '\n and headers \n', json.dumps(headers, indent=4))
