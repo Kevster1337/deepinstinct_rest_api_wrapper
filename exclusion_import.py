@@ -10,41 +10,11 @@
 # DI REST API.
 #
 
-# -- USAGE NOTES ---
-
-# This script accepts a pair of input files. One for Folder Exclusions and one
-# for Process Exclusions. Both input files should be single sheet (tab) OOXML
-# spreadsheets.
-#
-# The process exclusions input file must contain the following columns. Column
-# names are cASE seNSITive. Column order is irrelevant. Additional columns will
-# be ignored.
-#   Comment
-#   Policies
-#   Process
-#
-# The folder exclusions input file must contain the following columns. Column
-# names are cASE seNSITive. Column order is irrelevant. Additional columns will
-# be ignored.
-#   Comment
-#   Policies
-#   Folder
-#
-# The Policies column must contain exactly one of the following:
-#   The word All
-#   The name of one policy
-#   A list of policies delimited by <comma><space>. Example: Policy 1, Policy 2
-# Note: All of the above are cASE seNSITive
-#
-# This input file syntax is identical to what is created if you use the GUI to
-# export the exclusion lists. I suggest to take an export and then use that as
-# your template.
-
 import deepinstinct30 as di
 import pandas
 import time
 
-def run_exclusion_import(fqdn, key, process_exclusions_file_name, folder_exclusions_file_name):
+def run_exclusion_import(fqdn, key, file_name):
 
     start_time = time.perf_counter()
 
@@ -52,22 +22,28 @@ def run_exclusion_import(fqdn, key, process_exclusions_file_name, folder_exclusi
     di.key = key
 
     #read exclusions from files on disk as Pandas dataframes
-    process_exclusions_dataframe = pandas.read_excel(process_exclusions_file_name)
-    folder_exclusions_dataframe = pandas.read_excel(folder_exclusions_file_name)
+    process_exclusions_dataframe = pandas.read_excel(file_name, sheet_name='Process')
+    folder_exclusions_dataframe = pandas.read_excel(file_name, sheet_name='Folder')
+    behavioral_allow_lists_dataframe = pandas.read_excel(file_name, sheet_name='Behavioral')
 
     #replace any null values with empty string to avoid subsequent errors
     process_exclusions_dataframe.fillna('', inplace=True)
     folder_exclusions_dataframe.fillna('', inplace=True)
+    behavioral_allow_lists_dataframe.fillna('', inplace=True)
 
     #convert Pandas dataframes to Python dictionaries
     process_exclusions = process_exclusions_dataframe.to_dict('records')
     folder_exclusions = folder_exclusions_dataframe.to_dict('records')
+    behavioral_allow_lists = behavioral_allow_lists_dataframe.to_dict('records')
 
-    #convert policy field from string to list
-    for exclusion in process_exclusions:
-        exclusion['Policies'] = exclusion['Policies'].split(", ")
-    for exclusion in folder_exclusions:
-        exclusion['Policies'] = exclusion['Policies'].split(", ")
+    #convert fields expected to contain comma-separated lists from strings to lists
+    for item in process_exclusions:
+        item['Policies'] = item['Policies'].split(", ")
+    for item in folder_exclusions:
+        item['Policies'] = item['Policies'].split(", ")
+    for item in behavioral_allow_lists:
+        item['Policies'] = item['Policies'].split(", ")
+        item['Behaviors'] = item['Behaviors'].split(", ")
 
     #get policy list, then filter it to get a list of just Windows policies
     all_policies = di.get_policies()
@@ -124,10 +100,101 @@ def run_exclusion_import(fqdn, key, process_exclusions_file_name, folder_exclusi
                 di.add_folder_exclusion(exclusion=exclusion['Folder'], comment=exclusion['Comment'], policy_id=policy['id'])
 
 
+        #BEHAVIORAL ANALYSIS
+
+        #create a list to store entries that apply to this policy
+        behavioral_this_policy = []
+
+        #iterate though the imported folder exclusion list
+        for exclusion in behavioral_allow_lists:
+            #check if the exclusion applies to all policies
+            if exclusion['Policies'] == ['All']:
+                behavioral_this_policy.append(exclusion)
+            #check if the exclusion applies to this specific policy
+            elif policy['name'] in exclusion['Policies']:
+                behavioral_this_policy.append(exclusion)
+
+        #if we found some exclusions applicable to this policy, create them
+        if len(behavioral_this_policy) > 0:
+            print('INFO: Adding', len(behavioral_this_policy), 'behavioral allow lists to policy', policy['id'], policy['name'])
+            for exclusion in behavioral_this_policy:
+                di.add_behavioral_allow_lists(process_list=[exclusion['Process']], behavior_name_list=exclusion['Behaviors'], comment=exclusion['Comment'], policy_id=policy['id'])
+
         print('INFO: Done with policy', policy['id'], policy['name'])
 
     runtime_in_seconds = time.perf_counter() - start_time
     print('Runtime was', runtime_in_seconds, 'seconds.')
+
+def print_readme():
+    print("""
+-- USAGE NOTES ---
+
+This script accepts a single input file and has the ability to create up to
+three types of exclusions in bulk:
+1. Static Analysis Process Exclusions
+2. Static Analysis Folder Exclusions
+3. Behavioral Analysis Allow Lists
+
+All exclusions are applied to all visible Windows policies.
+
+The input file must be an OOXML spreadsheet (.xlsx file) and contain at minimum
+three sheets (tabs). Those sheets must be named:
+1. Process
+2. Folder
+3. Behavioral
+Sheet order is irrelevant. Additional sheets, if present, will be ignored.
+Sheet names are cASe SeNSITIVe. All sheets and their required column names
+detailed below must always be present, even if they contain no entries to
+import.
+
+The 'Process' sheet must contain the following columns. Column names are
+cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
+1. Comment
+2. Policies
+3. Process
+
+The 'Folder' sheet must contain the following columns. Column names are
+cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
+1. Comment
+2. Policies
+3. Folder
+
+The 'Behavioral' sheet must contain the following columns. Column names are
+cASE seNSITive. Column order is irrelevant. Additional columns will be ignored.
+1. Comment
+2. Policies
+3. Process
+4. Behaviors
+
+For all 3 sheets, the 'Policies' column must contain one of the following:
+A. The word All
+B. The name of one policy
+C. A list of policies delimited by <comma><space>. Example: Policy 1, Policy 2
+Note: All of the above are cASE seNSITive
+
+For the 'Behavioral' sheet, the 'Behaviors' column  must contain one of the
+following:
+A. The word All
+B. The name of one specific behavior
+C. A list of behaviors delimited by <comma><space>. Example: Behavior1, Behavior2
+
+For the 'Behavioral' sheet, the accepted values to includes in the 'Behaviors'
+column are:
+1. RANSOMWARE_FILE_ENCRYPTION
+2. REMOTE_CODE_INJECTION_EXECUTION
+3. KNOWN_SHELLCODE_PAYLOADS
+4. ARBITRARY_SHELLCODE_EXECUTION
+5. REFLECTIVE_DLL
+6. REFLECTIVE_DOTNET
+7. AMSI_BYPASS
+8. DIRECT_SYSTEMCALLS
+9. CREDENTIALS_DUMP
+Note: All of the above are cASE seNSITive
+
+Reference tanium_exclusions.xlsx for an example of the proper format.
+
+""")
+
 
 
 def main():
@@ -140,16 +207,14 @@ def main():
 
     key = input('Enter API Key for DI Server: ')
 
-    process_exclusions_file_name = input('Enter name of file containing process exclusions to import, or press enter to accept the default [process_exclusions.xlsx]: ')
-    if process_exclusions_file_name == '':
-        process_exclusions_file_name = 'process_exclusions.xlsx'
+    print_readme()
 
-    folder_exclusions_file_name = input('Enter name of file containing folder exclusions to import, or press enter to accept the default [folder_exclusions.xlsx]: ')
-    if folder_exclusions_file_name == '':
-        folder_exclusions_file_name = 'folder_exclusions.xlsx'
+    file_name = input('Enter name of file containing the exclusions to import, or press enter to accept the default [exclusions.xlsx]: ')
+    if file_name == '':
+        file_name = 'exclusions.xlsx'
 
     #run the import
-    return run_exclusion_import(fqdn=fqdn, key=key, process_exclusions_file_name=process_exclusions_file_name, folder_exclusions_file_name=folder_exclusions_file_name)
+    return run_exclusion_import(fqdn=fqdn, key=key, file_name=file_name)
 
 
 if __name__ == "__main__":
