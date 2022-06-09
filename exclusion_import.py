@@ -135,8 +135,6 @@ three types of exclusions in bulk:
 2. Static Analysis Folder Exclusions
 3. Behavioral Analysis Allow Lists
 
-All exclusions are applied to all visible Windows policies.
-
 The input file must be an OOXML spreadsheet (.xlsx file) and contain at minimum
 three sheets (tabs). Those sheets must be named:
 1. Process
