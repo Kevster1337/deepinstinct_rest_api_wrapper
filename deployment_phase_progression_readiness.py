@@ -97,21 +97,18 @@ def get_suspicious_event_search_parameters(deployment_phase):
     suspicious_search_parameters = {}
     suspicious_search_parameters['status'] = ['OPEN']
     suspicious_search_parameters['file_type'] = []
-    #search_parameters['type'] = []
 
     #example of how to focus just on a specific timeframe worth of events
     #suspicious_search_parameters['timestamp'] = {'from': '2022-04-24T00:00:00.000Z', 'to': '2022-05-03T00:00:00.000Z'}
 
     if deployment_phase in [1, 1.5]:
         #no events from suspicious events list for these phases
-        suspicious_search_parameters = None
+        suspicious_search_parameters = {}
 
     elif deployment_phase in [2]:
         suspicious_search_parameters['action'] = ['DETECTED']
         suspicious_search_parameters['file_type'].append('ACTIVE_SCRIPT')
         suspicious_search_parameters['file_type'].append('HTML_APPLICATION')
-        #suspicious_search_parameters['type'].append('SCRIPT_CONTROL_COMMAND')
-        #suspicious_search_parameters['type'].append('SCRIPT_CONTROL_PATH')
 
     return suspicious_search_parameters
 
@@ -139,16 +136,15 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     print('INFO: Calculating event search parameters')
     search_parameters = get_event_search_parameters(config['deployment_phase'])
 
-    if not config['ignore_suspicious_events']:
-        print('INFO: Calculating suspicious event search parameters')
-        suspicious_search_parameters = get_suspicious_event_search_parameters(config['deployment_phase'])
+    print('INFO: Calculating suspicious event search parameters')
+    suspicious_search_parameters = get_suspicious_event_search_parameters(config['deployment_phase'])
 
     print('INFO: Querying server for events matching the following criteria:\n', json.dumps(search_parameters, indent=4))
     events = di.get_events(search=search_parameters)
     print('INFO:', len(events), 'events were returned')
 
     if not config['ignore_suspicious_events']:
-        if suspicious_search_parameters != None:
+        if suspicious_search_parameters != {}:
             print('INFO: Querying server for suspicious events matching the following criteria:\n', json.dumps(suspicious_search_parameters, indent=4))
             suspicious_events = di.get_suspicious_events(search=suspicious_search_parameters)
             print('INFO:', len(suspicious_events), 'suspicious events were returned')
@@ -221,8 +217,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     devices_not_ready_df = pandas.DataFrame(devices_not_ready)
     config_df = pandas.DataFrame(config.items())
     search_parameters_df = pandas.DataFrame(search_parameters.items())
-    if not config['ignore_suspicious_events']:
-        suspicious_search_parameters_df = pandas.DataFrame(suspicious_search_parameters.items())
+    suspicious_search_parameters_df = pandas.DataFrame(suspicious_search_parameters.items())
 
 
     #prep for export
@@ -242,8 +237,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         devices_not_ready_df.to_excel(writer, sheet_name='not_ready_for_next_phase', index=False)
         config_df.to_excel(writer, sheet_name='config', index=False)
         search_parameters_df.to_excel(writer, sheet_name='event_search', index=False)
-        if not config['ignore_suspicious_events']:
-            suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
+        suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
 
     print(f'{folder_name}\\{file_name}')
     print('Done.')
@@ -261,9 +255,9 @@ Phase 1 ("Detection")
 -- Suspicious Script Execution
 -- Malicious PowerShell Command Execution
 
-Phase 1.5 ("Prevention Essentials")
+[OPTIONAL] Phase 1.5 ("Prevention Essentials")
+NOTE: This phase is skipped in most environments.
 All of above moves to Prevent mode.
-This phase is OPTIONAL. Most environments choose to move directly from phase 1 to phase 2.
 
 Phase 2 ("Prevention Essentials + Detection Advanced")
 All of above moves to Prevent mode.
@@ -281,7 +275,7 @@ Add the following in detect mode:
 -- HTML Applications
 -- ActiveScript Execution (JavaScript & VBScript)
 
-Phase 3 ("Advanced Protection")
+Phase 3 ("Full Prevention")
 All of above moves to Prevent mode. Aligns with Prescribed Security Settings:
 https://portal.deepinstinct.com/sys/document/preview/Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
 """)
