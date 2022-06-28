@@ -1597,3 +1597,26 @@ def add_script_path_allow_list(policy_id, path, comment=''):
     else:
         print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
         return False
+
+def get_audit_log():
+    page_size = 100
+    offset = 0
+    collected_data = []
+    headers = {'accept': 'application/json', 'Authorization': key}
+    while True:
+        request_url = f'https://{fqdn}/api/v1/audit_logs/?size={page_size}&offset={offset}'
+        response = requests.get(request_url, headers=headers)
+        #print(request_url, 'returned', response.status_code)
+        if response.status_code == 200:
+            audit_log_entries = response.json()
+            #print('The above request returned', len(audit_log_entries), 'entries.')
+            if len(audit_log_entries) > 0:
+                for item in audit_log_entries:
+                    collected_data.append(item)
+                    offset += 1
+            else:
+                break
+        else:
+            print('ERROR: Unexpected response code', response.status_code, 'on GET', request_url, 'with headers', headers)
+            time.sleep(10)
+    return collected_data
