@@ -184,17 +184,18 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     for device in devices:
         device['last_contact_days_ago'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_contact'])).days
 
-    #add days_since_deployment field to devices
-    print('INFO: Adding days_since_deployment to device data by comparing last_registration to current datetime')
+    #add days_since_install field to devices
+    print('INFO: Adding days_since_install to device data by comparing last_registration to current datetime')
     for device in devices:
-        device['days_since_deployment'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_registration'])).days
+        device['days_since_install'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_registration'])).days
 
     print('INFO: Evaluating devices to determine which are ready to progress to the next phase')
     for device in devices:
         device['ready_to_move_to_next_phase'] = False
         if device['last_contact_days_ago'] <= int(config['max_days_since_last_contact']):
             if device['event_count'] <= int(config['max_open_event_quantity']):
-                device['ready_to_move_to_next_phase'] = True
+                if device['days_since_install'] >= int(config['min_days_since_install']):
+                    device['ready_to_move_to_next_phase'] = True
 
     print('INFO: Sorting devices into list by readiness')
     devices_ready = []
@@ -303,6 +304,10 @@ def main():
     config['max_open_event_quantity'] = input('Enter the maximum number of Open Events for a device to be eligible to progress to the next phase, or press enter to accept the default [0]: ')
     if config['max_open_event_quantity'] == '':
         config['max_open_event_quantity'] = 0
+
+    config['min_days_since_install'] = input('Enter the minimum days that a device must be installed in order to be eligible to progress to the next phase, or press enter to accept the default [7]: ')
+    if config['min_days_since_install'] == '':
+        config['min_days_since_install'] = 7
 
     config['ignore_suspicious_events'] = ''
     while config['ignore_suspicious_events'] not in [True, False]:
