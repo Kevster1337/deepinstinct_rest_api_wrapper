@@ -167,7 +167,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     devices = filtered_devices
 
     print('')
-    print(len(devices), 'of devices are in a phase', config['deployment_phase'], 'policy.')
+    print(len(devices), 'devices are in a phase', config['deployment_phase'], 'policy.')
 
     if len(devices) == 0:
         print('ERROR: Aborting analysis due to zero devices to analyze.')
@@ -260,7 +260,7 @@ Phase 2
 
 Phase 3
     Phase 2 features move to prevent mode
-    Alignes with Prescribed Security Settings published at the following URL:
+    Aligns with Prescribed Security Settings published at the following URL:
     https://portal.deepinstinct.com/sys/document/preview/Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
 
 This tool currently supports Windows devices and policies. All non-Windows
@@ -335,11 +335,11 @@ def main():
         key = input('API Key: ')
 
     print("""
-All required configuration paramaters have been provided. The rest of this
+All required configuration parameters have been provided. The rest of this
 process runs unattended. Duration depends upon the volume of data to be analyzed
 (policies, devices, and events) and can vary from 1 minute to multiple hours.
-When analysis is complete, a brief summary will be printed here and full results
-will be written to disk as an Excel document.
+When analysis is complete, a summary will be printed here, and full results will
+be written to disk as an Excel document.
     """)
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)
