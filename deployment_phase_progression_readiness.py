@@ -11,7 +11,7 @@
 #
 
 # import required libraries
-import deepinstinct30 as di, json, datetime, pandas, re
+import deepinstinct30 as di, json, datetime, pandas, re, sys
 from dateutil import parser
 
 # Calculates deployment phase for a Windows policy. Non-conforming and non-Windows policies return 0.
@@ -115,114 +115,102 @@ def get_suspicious_event_search_parameters(deployment_phase):
 
 def run_deployment_phase_progression_readiness(fqdn, key, config):
 
-    print('\nINFO: Beginning analysis')
+    print('Beginning data collection')
 
     di.fqdn = fqdn
     di.key = key
     config = config
 
     #collect policy data
-    print('INFO: Getting policy list and data from server')
+    print('Getting policy data from server')
     policies = di.get_policies(include_policy_data=True)
-    #calculate deployment_phase for each policy and add to policy data
-    print('INFO: Evaluating policy data to determine deployment phase(s)')
-    print('phase\t id\t name')
+    print('Analyzing policy data')
     for policy in policies:
         policy['deployment_phase'] = classify_policy(policy, config)
         if policy['os'] == 'WINDOWS':
-            print(policy['deployment_phase'], '\t', policy['id'], '\t', policy['name'])
+            if policy['deployment_phase'] > 0:
+                print(f"Policy '{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy.")
+            else:
+                print(f"Policy '{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase.")
 
     #collect event data
-    print('INFO: Calculating event search parameters')
     search_parameters = get_event_search_parameters(config['deployment_phase'])
-
-    print('INFO: Calculating suspicious event search parameters')
     suspicious_search_parameters = get_suspicious_event_search_parameters(config['deployment_phase'])
-
-    print('INFO: Querying server for events matching the following criteria:\n', json.dumps(search_parameters, indent=4))
+    print('\nGetting event data from server')
     events = di.get_events(search=search_parameters)
-    print('INFO:', len(events), 'events were returned')
+    print(len(events), 'events were returned.')
 
     if not config['ignore_suspicious_events']:
         if suspicious_search_parameters != {}:
-            print('INFO: Querying server for suspicious events matching the following criteria:\n', json.dumps(suspicious_search_parameters, indent=4))
+            print('\nGetting suspicious event data from server')
             suspicious_events = di.get_suspicious_events(search=suspicious_search_parameters)
-            print('INFO:', len(suspicious_events), 'suspicious events were returned')
+            print(len(suspicious_events), 'suspicious events were returned.')
             events = events + suspicious_events
+            print('A combined total of', len(events), 'events were returned.')
 
-    print('INFO:', len(events), 'total events were returned')
-
-    print('INFO: Summarizing event data by device id')
     event_counts = di.count_data_by_field(events, 'device_id')
 
     #collect device data
-    print('INFO: Getting device list from server')
+    print('\nGetting device data from server')
     devices = di.get_devices(include_deactivated=False)
-    print('INFO:', len(devices), 'devices were returned')
-    print('INFO: Appending deployment phase data to device list')
+    print(len(devices), 'devices were found.')
+
+    filtered_devices = []
     for device in devices:
         for policy in policies:
             if policy['id'] == device['policy_id']:
                 device['deployment_phase'] = policy['deployment_phase']
-
-    print('INFO: Filtering device data to remove devices not in a phase', config['deployment_phase'], 'policy')
-    filtered_devices = []
-    for device in devices:
-        if device['deployment_phase'] == config['deployment_phase']:
-            filtered_devices.append(device)
+                if device['deployment_phase'] == config['deployment_phase']:
+                    filtered_devices.append(device)
+    excluded_device_count = len(devices) - len(filtered_devices)
     devices = filtered_devices
-    print('INFO:', len(devices), 'devices remain')
 
-    print('INFO: Adding event count data to device list')
+    print(len(devices), 'of those devices are in a phase', config['deployment_phase'], 'policy.')
+
+    if len(devices) == 0:
+        print('Exiting due to zero devices to analyze.')
+        sys.exit(0)
+
+
+    print('\nAnalyzing devices based on provided criteria (configuration)')
+
+    devices_ready = []
+    devices_not_ready = []
+
     for device in devices:
         if device['id'] not in event_counts.keys():
             device['event_count'] = 0
         else:
             device['event_count'] = event_counts[device['id']]
-
-    print('INFO: Calculating days since last contact and adding results to device list')
-    for device in devices:
         device['last_contact_days_ago'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_contact'])).days
-
-    #add days_since_install field to devices
-    print('INFO: Adding days_since_install to device data by comparing last_registration to current datetime')
-    for device in devices:
         device['days_since_install'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_registration'])).days
 
-    print('INFO: Evaluating devices to determine which are ready to progress to the next phase')
-    for device in devices:
         device['ready_to_move_to_next_phase'] = False
         if device['last_contact_days_ago'] <= int(config['max_days_since_last_contact']):
             if device['event_count'] <= int(config['max_open_event_quantity']):
                 if device['days_since_install'] >= int(config['min_days_since_install']):
                     device['ready_to_move_to_next_phase'] = True
 
-    print('INFO: Sorting devices into list by readiness')
-    devices_ready = []
-    devices_not_ready = []
-    for device in devices:
         if device['ready_to_move_to_next_phase']:
             devices_ready.append(device)
         else:
             devices_not_ready.append(device)
 
-    print('INFO: Analysis is complete')
+    print('Analysis is complete')
+    print(len(devices_ready), 'devices are ready to move to the next phase.')
+    print(len(devices_not_ready), 'devices are not ready based on violating one or more of the provided criteria.')
+    print(excluded_device_count, 'devices in the system were not assessed due to not being in a phase "{:g}".format(float(config["deployment_phase"]) policy.')
 
-    #print summary to console
-    print(len(devices_ready), 'of', len(devices), 'devices are ready to progress beyond phase', "{:g}".format(float(config['deployment_phase'])), 'and', len(devices_not_ready), 'devices are not based on this criteria:')
-    print(json.dumps(config,indent=4))
+    print('\nExporting results to disk')
 
     #convert data to be exported to dataframes
-    print('INFO: Creating pandas dataframes')
     devices_ready_df = pandas.DataFrame(devices_ready)
     devices_not_ready_df = pandas.DataFrame(devices_not_ready)
     config_df = pandas.DataFrame(config.items())
     search_parameters_df = pandas.DataFrame(search_parameters.items())
     suspicious_search_parameters_df = pandas.DataFrame(suspicious_search_parameters.items())
 
-
     #prep for export
-    print('INFO: Preparing export folder and file name')
     folder_name = di.create_export_folder()
     from_deployment_phase = "{:g}".format(float(config['deployment_phase']))
     if di.is_server_multitenancy_enabled():
@@ -232,7 +220,6 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     file_name = f'deployment_phase_{from_deployment_phase}_progression_readiness_assessment_{datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d_%H.%M")}_UTC_{server_shortname}.xlsx'
 
     #export dataframes to Excel format
-    print('INFO: Exporting dataframes to disk')
     with pandas.ExcelWriter(f'{folder_name}/{file_name}') as writer:
         devices_ready_df.to_excel(writer, sheet_name='ready_for_next_phase', index=False)
         devices_not_ready_df.to_excel(writer, sheet_name='not_ready_for_next_phase', index=False)
@@ -240,86 +227,92 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         search_parameters_df.to_excel(writer, sheet_name='event_search', index=False)
         suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
 
-    print(f'{folder_name}\\{file_name}')
-    print('Done.')
+    print(f'\nDone! Data was exported to disk as\n{folder_name}\\{file_name}\n')
 
 def print_readme_on_deployemnt_phases():
     print("""
------------------
-DEPLOYMENT PHASES
------------------
+    --Deployment Phase Progression Readiness Evaluation--
 
-Phase 1 ("Detection")
-4 features, all in detect mode:
--- Static Analysis (Threat Severity on PE files set to ≥ Moderate)
--- Ransomware Behavior
--- Suspicious Script Execution
--- Malicious PowerShell Command Execution
+    This tool evaluates your Deep Instinct policies, events, and devices and
+    assesses readiness (or lack thereof) of devices to move to a subsequent
+    deployment phase based on criteria you provide. A "Read Only" or greater API
+    Key is required, and the results are written to disk in MS Excel format.
+    This tool currently supports Windows devices and policies. All non-Windows
+    data is excluded from analysis.
 
-[OPTIONAL] Phase 1.5 ("Prevention Essentials")
-NOTE: This phase is skipped in most environments.
-All of above moves to Prevent mode.
+    The deployment phases are defined as follows:
 
-Phase 2 ("Prevention Essentials + Detection Advanced")
-All of above moves to Prevent mode.
+    Phase 1
+    4 features, all in detect mode:
+    -- Static Analysis (Threat Severity on PE files set to ≥ Moderate)
+    -- Ransomware Behavior
+    -- Suspicious Script Execution
+    -- Malicious PowerShell Command Execution
 
-Add the following in prevent mode (it has no detect mode):
--- In-Memory Protection --> Known Payload Execution
+    Phase 2
+    Features from Phase 1 move from detect mode to prevent mode.
+    +
+    Add the following in detect mode:
+    -- In-Memory Protection --> Arbitrary Shellcode
+    -- In-Memory Protection --> Remote Code Injection
+    -- In-Memory Protection --> Reflective DLL Injection
+    -- In-Memory Protection --> .Net Reflection
+    -- In-Memory Protection --> AMSI Bypass
+    -- In-Memory Protection --> Credential Dumping
+    -- HTML Applications
+    -- ActiveScript Execution (JavaScript & VBScript)
+    +
+    Add the following in prevent mode (it has no detect mode):
+    -- In-Memory Protection --> Known Payload Execution
 
-Add the following in detect mode:
--- In-Memory Protection --> Arbitrary Shellcode
--- In-Memory Protection --> Remote Code Injection
--- In-Memory Protection --> Reflective DLL Injection
--- In-Memory Protection --> .Net Reflection
--- In-Memory Protection --> AMSI Bypass
--- In-Memory Protection --> Credential Dumping
--- HTML Applications
--- ActiveScript Execution (JavaScript & VBScript)
+    Phase 3
+    Features from Phase 2 move from detect mode to prevent mode. Aligns with the
+    Prescribed Security Settings published at the following URL:
+    https://portal.deepinstinct.com/sys/document/preview/
+    Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
 
-Phase 3 ("Full Prevention")
-All of above moves to Prevent mode. Aligns with Prescribed Security Settings:
-https://portal.deepinstinct.com/sys/document/preview/Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
+    Below you will be asked a series of configuration questions. For each
+    prompt, either enter a custom value or press return (enter) without entering
+    any value to accept the default displayed in square brackets.
 """)
 
 
 def main():
-    #prompt for config
-    fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [di-service.customers.deepinstinctweb.com]: ')
-    if fqdn == '':
-        fqdn = 'di-service.customers.deepinstinctweb.com'
 
-    key = input('Enter API Key for DI Server: ')
+    print_readme_on_deployemnt_phases()
 
     config = {}
 
-    print_readme_on_deployemnt_phases()
-    config['deployment_phase'] = 0
-    while config['deployment_phase'] not in (1, 1.5, 2):
-        config['deployment_phase'] = float(input('Enter the deployment phase of the devices you want to evaluate for readiness to move to a subsequent phase ( 1 | 1.5 | 2 ): '))
+    phase = 0
+    while phase not in ('1', '1.5', '2', ''):
+        phase = input('Phase number that the devices you want to evaluate are currently in [1]: ')
+        if phase == '':
+            phase = '1'
+    config['deployment_phase'] = float(phase)
 
-    config['max_days_since_last_contact'] = input('Enter the maximum days since Last Contact for a device to be eligible to progress to the next phase, or press enter to accept the default [3]: ')
-    if config['max_days_since_last_contact'] == '':
-        config['max_days_since_last_contact'] = 3
-
-    config['max_open_event_quantity'] = input('Enter the maximum number of Open Events for a device to be eligible to progress to the next phase, or press enter to accept the default [0]: ')
-    if config['max_open_event_quantity'] == '':
-        config['max_open_event_quantity'] = 0
-
-    config['min_days_since_install'] = input('Enter the minimum days that a device must be installed in order to be eligible to progress to the next phase, or press enter to accept the default [7]: ')
+    config['min_days_since_install'] = input('Minimum days since install [7]: ')
     if config['min_days_since_install'] == '':
         config['min_days_since_install'] = 7
 
+    config['max_days_since_last_contact'] = input('Maximum days offline [3]: ')
+    if config['max_days_since_last_contact'] == '':
+        config['max_days_since_last_contact'] = 3
+
+    config['max_open_event_quantity'] = input('Maximum open events [0]: ')
+    if config['max_open_event_quantity'] == '':
+        config['max_open_event_quantity'] = 0
+
     config['ignore_suspicious_events'] = ''
     while config['ignore_suspicious_events'] not in [True, False]:
-        user_input = input('Ignore data from the Suspicious Events list? Enter YES or NO, or press enter to accept the default [NO]: ')
-        if user_input.lower() == 'yes':
+        user_input = input('YES/NO: Include Suspicious Events [YES]: ')
+        if user_input.lower() == 'no':
             config['ignore_suspicious_events'] = True
-        elif user_input.lower() in ['no', '']:
+        elif user_input.lower() in ['yes', '']:
             config['ignore_suspicious_events'] = False
 
     config['ignore_html_applications_action'] = ''
     while config['ignore_html_applications_action'] not in [True, False]:
-        user_input = input('Ignore the policy setting "HTML Applications (HTA files) and JavaScript via rundll32 executions" when evaluating policies? Enter YES or NO, or press enter to accept the default [NO]: ')
+        user_input = input('YES/NO: Ignore "HTML Applications (HTA files) and JavaScript via rundll32 executions" policy setting [NO]: ')
         if user_input.lower() == 'yes':
             config['ignore_html_applications_action'] = True
         elif user_input.lower() in ['no', '']:
@@ -327,11 +320,29 @@ def main():
 
     config['ignore_activescript_action'] = ''
     while config['ignore_activescript_action'] not in [True, False]:
-        user_input = input('Ignore the policy setting "ActiveScript execution (JavaScript & VBScript)" when evaluating policies? Enter YES or NO, or press enter to accept the default [NO]: ')
+        user_input = input('YES/NO: Ignore "ActiveScript execution (JavaScript & VBScript)" policy setting [NO]: ')
         if user_input.lower() == 'yes':
             config['ignore_activescript_action'] = True
         elif user_input.lower() in ['no', '']:
             config['ignore_activescript_action'] = False
+
+    fqdn = ''
+    while fqdn[-20:] != '.deepinstinctweb.com':
+        fqdn = input('DI server FQDN [di-service.customers.deepinstinctweb.com]: ')
+        if len(fqdn) == 0:
+            fqdn = 'di-service.customers.deepinstinctweb.com'
+
+    key = ''
+    while len(key) != 257:
+        key = input('API Key: ')
+
+    print("""
+    All required configuration paramaters have been provided. The rest of this
+    process can run unattended. Duration depends upon the volume of data to be
+    analyzed (policies, devices, and events) and can vary from 1 minute to
+    multiple hours. When analysis is complete, a brief summary will be printed
+    here and full results will be written to disk as an Excel document.
+    """)
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)
 
