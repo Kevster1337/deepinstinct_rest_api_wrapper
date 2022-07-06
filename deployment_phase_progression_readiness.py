@@ -119,19 +119,12 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
 
     di.fqdn = fqdn
     di.key = key
+    di.quiet_mode = True
     config = config
 
     #collect policy data
-    print('Getting policy data from server')
+    print('\nGetting policy data from server')
     policies = di.get_policies(include_policy_data=True)
-    print('Analyzing policy data')
-    for policy in policies:
-        policy['deployment_phase'] = classify_policy(policy, config)
-        if policy['os'] == 'WINDOWS':
-            if policy['deployment_phase'] > 0:
-                print(f"Policy '{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy.")
-            else:
-                print(f"Policy '{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase.")
 
     #collect event data
     search_parameters = get_event_search_parameters(config['deployment_phase'])
@@ -146,7 +139,6 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
             suspicious_events = di.get_suspicious_events(search=suspicious_search_parameters)
             print(len(suspicious_events), 'suspicious events were returned.')
             events = events + suspicious_events
-            print('A combined total of', len(events), 'events were returned.')
 
     event_counts = di.count_data_by_field(events, 'device_id')
 
@@ -154,6 +146,15 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     print('\nGetting device data from server')
     devices = di.get_devices(include_deactivated=False)
     print(len(devices), 'devices were found.')
+
+    print('\nAnalyzing policy data')
+    for policy in policies:
+        policy['deployment_phase'] = classify_policy(policy, config)
+        if policy['os'] == 'WINDOWS':
+            if policy['deployment_phase'] > 0:
+                print(f"Policy '{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy.")
+            else:
+                print(f"Policy '{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase.")
 
     filtered_devices = []
     for device in devices:
@@ -165,14 +166,12 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     excluded_device_count = len(devices) - len(filtered_devices)
     devices = filtered_devices
 
-    print(len(devices), 'of those devices are in a phase', config['deployment_phase'], 'policy.')
+    print('')
+    print(len(devices), 'of devices are in a phase', config['deployment_phase'], 'policy.')
 
     if len(devices) == 0:
-        print('Exiting due to zero devices to analyze.')
+        print('ERROR: Aborting analysis due to zero devices to analyze.')
         sys.exit(0)
-
-
-    print('\nAnalyzing devices based on provided criteria (configuration)')
 
     devices_ready = []
     devices_not_ready = []
@@ -196,12 +195,9 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         else:
             devices_not_ready.append(device)
 
-    print('Analysis is complete')
     print(len(devices_ready), 'devices are ready to move to the next phase.')
     print(len(devices_not_ready), 'devices are not ready based on violating one or more of the provided criteria.')
-    print(excluded_device_count, 'devices in the system were not assessed due to not being in a phase "{:g}".format(float(config["deployment_phase"]) policy.')
-
-    print('\nExporting results to disk')
+    print(excluded_device_count, 'devices in the system were not assessed due to not being in a phase', config['deployment_phase'], 'policy.')
 
     #convert data to be exported to dataframes
     devices_ready_df = pandas.DataFrame(devices_ready)
@@ -227,53 +223,55 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         search_parameters_df.to_excel(writer, sheet_name='event_search', index=False)
         suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
 
-    print(f'\nDone! Data was exported to disk as\n{folder_name}\\{file_name}\n')
+    print('')
+    print(f'Results were exported to disk as\n{folder_name}\\{file_name}\n')
 
 def print_readme_on_deployemnt_phases():
     print("""
-    --Deployment Phase Progression Readiness Evaluation--
+--Deployment Phase Progression Readiness Evaluation--
 
-    This tool evaluates your Deep Instinct policies, events, and devices and
-    assesses readiness (or lack thereof) of devices to move to a subsequent
-    deployment phase based on criteria you provide. A "Read Only" or greater API
-    Key is required, and the results are written to disk in MS Excel format.
-    This tool currently supports Windows devices and policies. All non-Windows
-    data is excluded from analysis.
+This tool evaluates your Deep Instinct policies, events, and devices and
+assesses readiness (or lack thereof) of devices to move to a subsequent
+deployment phase based on criteria you provide.
 
-    The deployment phases are defined as follows:
+The deployment phases are defined as follows:
 
-    Phase 1
+Phase 1:
     4 features, all in detect mode:
-    -- Static Analysis (Threat Severity on PE files set to ≥ Moderate)
-    -- Ransomware Behavior
-    -- Suspicious Script Execution
-    -- Malicious PowerShell Command Execution
+        Static Analysis (Threat Severity on PE files set to ≥ Moderate)
+        Ransomware Behavior
+        Suspicious Script Execution
+        Malicious PowerShell Command Execution
 
-    Phase 2
-    Features from Phase 1 move from detect mode to prevent mode.
-    +
-    Add the following in detect mode:
-    -- In-Memory Protection --> Arbitrary Shellcode
-    -- In-Memory Protection --> Remote Code Injection
-    -- In-Memory Protection --> Reflective DLL Injection
-    -- In-Memory Protection --> .Net Reflection
-    -- In-Memory Protection --> AMSI Bypass
-    -- In-Memory Protection --> Credential Dumping
-    -- HTML Applications
-    -- ActiveScript Execution (JavaScript & VBScript)
-    +
-    Add the following in prevent mode (it has no detect mode):
-    -- In-Memory Protection --> Known Payload Execution
+Phase 2
+    Phase 1 features move to prevent mode
+    Enable In-Memory Protection
+    8 additional features, all in detect mode:
+        Arbitrary Shellcode
+        Remote Code Injection
+        Reflective DLL Injection
+        .Net Reflection
+        AMSI Bypass
+        Credential Dumping
+        HTML Applications
+        ActiveScript Execution (JavaScript & VBScript)
+    1 additional feature in prevent mode:
+        Known Payload Execution
 
-    Phase 3
-    Features from Phase 2 move from detect mode to prevent mode. Aligns with the
-    Prescribed Security Settings published at the following URL:
-    https://portal.deepinstinct.com/sys/document/preview/
-    Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
+Phase 3
+    Phase 2 features move to prevent mode
+    Alignes with Prescribed Security Settings published at the following URL:
+    https://portal.deepinstinct.com/sys/document/preview/Deep-Instinct-Prescribed-Security-Settings-210802120146.pdf
 
-    Below you will be asked a series of configuration questions. For each
-    prompt, either enter a custom value or press return (enter) without entering
-    any value to accept the default displayed in square brackets.
+This tool currently supports Windows devices and policies. All non-Windows
+data is excluded from analysis.
+
+A "Read Only" or greater API Key is required, and the results are written to
+disk in MS Excel format.
+
+Below you will be asked a series of configuration questions. For each
+prompt, either enter a custom value or press return (enter) without entering
+any value to accept the default displayed in square brackets.
 """)
 
 
@@ -337,11 +335,11 @@ def main():
         key = input('API Key: ')
 
     print("""
-    All required configuration paramaters have been provided. The rest of this
-    process can run unattended. Duration depends upon the volume of data to be
-    analyzed (policies, devices, and events) and can vary from 1 minute to
-    multiple hours. When analysis is complete, a brief summary will be printed
-    here and full results will be written to disk as an Excel document.
+All required configuration paramaters have been provided. The rest of this
+process runs unattended. Duration depends upon the volume of data to be analyzed
+(policies, devices, and events) and can vary from 1 minute to multiple hours.
+When analysis is complete, a brief summary will be printed here and full results
+will be written to disk as an Excel document.
     """)
 
     return run_deployment_phase_progression_readiness(fqdn=fqdn, key=key, config=config)

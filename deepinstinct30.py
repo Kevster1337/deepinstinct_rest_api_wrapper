@@ -26,6 +26,7 @@
 #
 
 debug_mode = False
+quiet_mode = False
 
 # Import various libraries used by one or more method below.
 import requests, json, datetime, pandas, re, ipaddress, time, os, hashlib
@@ -284,7 +285,8 @@ def get_devices(include_deactivated=True):
                 last_id = response['last_id'] #save returned last_id for reuse on next request
             else: #added this to handle issue where some server versions fail to return last_id on final batch of devices
                 last_id = None
-            print(request_url, 'returned 200 with last_id', last_id, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned 200 with last_id', last_id, end='\r')
             if 'devices' in response:
                 devices = response['devices'] #extract devices from response
                 for device in devices: #iterate through the list of devices
@@ -295,7 +297,8 @@ def get_devices(include_deactivated=True):
             'on request to\n', request_url, '\nwith headers\n', headers)
             error_count += 1  #increment error counter
             time.sleep(10) #wait before trying request again
-    print('\n')
+    if not quiet_mode:
+        print('\n')
 
     # When while loop exists, we know we have collected all visible data
 
@@ -409,7 +412,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
             policy_id = policy['id']
             request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
             response = requests.get(request_url, headers=headers)
-            print(request_url, 'returned', response.status_code, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned', response.status_code, end='\r')
             # Check response code (for some platforms, no policy data available)
             if response.status_code == 200:
                 # Extract policy data from response and append it to policy
@@ -418,7 +422,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
                 else:
                     policy_data = response.json()['data']
                 policy.update(policy_data)
-        print('\n')
+        if not quiet_mode:
+            print('\n')
 
     # APPEND ALLOW-LIST, DENY-LIST, AND EXCLUSION DATA (IF ENABLED)
     if include_allow_deny_lists:
@@ -452,7 +457,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
                 if response.status_code == 200:
                     response = response.json()
                     policy['allow_deny_and_exclusion_lists'][list_type] = response
-        print('\n')
+        if not quiet_mode:
+            print('\n')
 
     # RETURN THE COLLECTED DATA
     return policies
@@ -582,7 +588,8 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
                 minimum_event_id = response.json()['last_id']
 
                 #print result to console
-                print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
+                if not quiet_mode:
+                    print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
 
                 #if we got a none-null last_id back
                 if minimum_event_id != None:
@@ -600,7 +607,8 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
             minimum_event_id = response.json()['last_id']
 
             #print result to console
-            print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
 
             #if we got a none-null last_id back
             if minimum_event_id != None:
@@ -609,7 +617,8 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
                 #append the event(s) from this response to collected_events
                 for event in events:
                     collected_events.append(event)
-    print('\n')
+    if not quiet_mode:
+        print('\n')
 
     #return the list of collected events
     return collected_events
