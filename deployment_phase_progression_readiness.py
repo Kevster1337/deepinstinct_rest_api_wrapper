@@ -121,6 +121,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     di.key = key
     di.quiet_mode = True
     config = config
+    mt = di.is_server_multitenancy_enabled()
 
     #collect policy data
     print('\nGetting policy data from server')
@@ -148,13 +149,18 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     print(len(devices), 'devices were found.')
 
     print('\nAnalyzing policy data')
+    policy_evaluation_results = []
     for policy in policies:
         policy['deployment_phase'] = classify_policy(policy, config)
         if policy['os'] == 'WINDOWS':
             if policy['deployment_phase'] > 0:
-                print(f"Policy '{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy.")
+                result = f"Policy'{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy."
             else:
-                print(f"Policy '{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase.")
+                result = f"Policy'{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase."
+            if mt:
+                result = f"MSP '{policy['msp_name']}' (ID {policy['msp_id']}) {result}"
+            print(result)
+            policy_evaluation_results.append(result)
 
     filtered_devices = []
     for device in devices:
@@ -205,6 +211,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     config_df = pandas.DataFrame(config.items())
     search_parameters_df = pandas.DataFrame(search_parameters.items())
     suspicious_search_parameters_df = pandas.DataFrame(suspicious_search_parameters.items())
+    policy_evaluation_results_df = pandas.DataFrame(policy_evaluation_results)
 
     #prep for export
     folder_name = di.create_export_folder()
@@ -222,6 +229,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         config_df.to_excel(writer, sheet_name='config', index=False)
         search_parameters_df.to_excel(writer, sheet_name='event_search', index=False)
         suspicious_search_parameters_df.to_excel(writer, sheet_name='suspicious_event_search', index=False)
+        policy_evaluation_results_df.to_excel(writer, sheet_name='policy_evaluation', index=False)
 
     print('')
     print(f'Results were exported to disk as\n{folder_name}\\{file_name}\n')
