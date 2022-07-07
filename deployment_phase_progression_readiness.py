@@ -331,7 +331,7 @@ def main():
             fqdn = 'di-service.customers.deepinstinctweb.com'
 
     key = ''
-    while len(key) != 257:
+    while len(key) < 256:
         key = input('API Key: ')
 
     print("""
