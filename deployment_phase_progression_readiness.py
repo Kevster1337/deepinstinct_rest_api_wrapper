@@ -148,16 +148,26 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     devices = di.get_devices(include_deactivated=False)
     print(len(devices), 'devices were found.')
 
+    #determine if we have data from a single MSP or multiple
+    policy_msp_ids = []
+    for policy in policies:
+        if policy['msp_id'] not in policy_msp_ids:
+            policy_msp_ids.append(policy['msp_id'])
+    if len(policy_msp_ids) > 1:
+        multiple_msps = True
+    else:
+        multiple_msps = False
+
     print('\nAnalyzing policy data')
     policy_evaluation_results = []
     for policy in policies:
         policy['deployment_phase'] = classify_policy(policy, config)
         if policy['os'] == 'WINDOWS':
             if policy['deployment_phase'] > 0:
-                result = f"Policy'{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy."
+                result = f"Policy '{policy['name']}' (ID {policy['id']}) is a Phase {policy['deployment_phase']} policy."
             else:
-                result = f"Policy'{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase."
-            if mt:
+                result = f"Policy '{policy['name']}' (ID {policy['id']}) is not aligned with any defined Deployment Phase."
+            if mt and multiple_msps:
                 result = f"MSP '{policy['msp_name']}' (ID {policy['msp_id']}) {result}"
             print(result)
             policy_evaluation_results.append(result)
@@ -190,16 +200,24 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
         device['last_contact_days_ago'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_contact'])).days
         device['days_since_install'] = (datetime.datetime.now(datetime.timezone.utc) - parser.parse(device['last_registration'])).days
 
-        device['ready_to_move_to_next_phase'] = False
-        if device['last_contact_days_ago'] <= int(config['max_days_since_last_contact']):
-            if device['event_count'] <= int(config['max_open_event_quantity']):
-                if device['days_since_install'] >= int(config['min_days_since_install']):
-                    device['ready_to_move_to_next_phase'] = True
 
-        if device['ready_to_move_to_next_phase']:
-            devices_ready.append(device)
-        else:
+        device['progression_criteria_violations'] = []
+
+        if device['event_count'] > int(config['max_open_event_quantity']):
+            device['progression_criteria_violations'].append('More than ' + str(config['max_open_event_quantity']) + ' open events')
+
+        if device['last_contact_days_ago'] > int(config['max_days_since_last_contact']):
+            device['progression_criteria_violations'].append('Offline for more than ' + str(config['max_days_since_last_contact']) + ' days')
+
+        if device['days_since_install'] < int(config['min_days_since_install']):
+            device['progression_criteria_violations'].append('Installed less than ' + str (config['min_days_since_install']) + ' days ago')
+
+        if len(device['progression_criteria_violations']) > 0:
+            device['ready_to_move_to_next_phase'] = False
             devices_not_ready.append(device)
+        else:
+            device['ready_to_move_to_next_phase'] = True
+            devices_ready.append(device)
 
     print(len(devices_ready), 'devices are ready to move to the next phase.')
     print(len(devices_not_ready), 'devices are not ready based on violating one or more of the provided criteria.')
@@ -216,7 +234,7 @@ def run_deployment_phase_progression_readiness(fqdn, key, config):
     #prep for export
     folder_name = di.create_export_folder()
     from_deployment_phase = "{:g}".format(float(config['deployment_phase']))
-    if di.is_server_multitenancy_enabled():
+    if di.is_server_multitenancy_enabled() and not multiple_msps:
         server_shortname = re.sub(r'[^a-z0-9]','',policies[0]['msp_name'].lower())
     else:
         server_shortname = di.fqdn.split(".",1)[0]
@@ -291,7 +309,7 @@ def main():
 
     phase = 0
     while phase not in ('1', '1.5', '2', ''):
-        phase = input('Phase number that the devices you want to evaluate are currently in [1]: ')
+        phase = input('Devices to evaluate are currently in what phase? [1]: ')
         if phase == '':
             phase = '1'
     config['deployment_phase'] = float(phase)
