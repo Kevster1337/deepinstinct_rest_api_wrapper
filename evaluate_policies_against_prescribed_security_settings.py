@@ -86,10 +86,10 @@ def add_device_counts(policy_list):
     devices = di.get_devices(include_deactivated=False)
     device_counts = di.count_data_by_field(devices, 'policy_id')
     for policy in policy_list:
-        if policy['policy_id'] not in device_counts.keys():
-            policy['device_count'] = 0
+        if policy['ID'] not in device_counts.keys():
+            policy['Device Count'] = 0
         else:
-            policy['device_count'] = device_counts[policy['policy_id']]
+            policy['Device Count'] = device_counts[policy['ID']]
     return policy_list
 
 def main():
