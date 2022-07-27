@@ -77,7 +77,8 @@ def calculate_export_file_name(policies, mt, multi_msp):
 
 def export_results(results, file_name):
     results_df = pandas.DataFrame(results)
-    results_df.to_excel(file_name, index=False)
+    results_df.sort_values(by=['MSP Name','Name'], inplace=True)
+    results_df.to_excel(file_name, sheet_name='Policy Audit', index=False)
     print('Results written to disk as', file_name, '.')
     print('Non-confirming settings are denoted by wrapping the non-confirming value in hyphens.')
     print('Some settings require manual review until/unless "FR-0000135 - Add missing Windows policy settings to Deep Instinct REST API WindowsPolicyData model" is implemented.')
@@ -98,7 +99,7 @@ def main():
     mt = di.is_server_multitenancy_enabled()
     multi_msp = data_from_more_than_one_msp(policies)
     results = evaluate_policies(policies, multi_msp)
-    if input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [NO]: ').lower() == 'yes':
+    if input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [YES]: ').lower() != 'no':
         results = add_device_counts(results)
     file_name = calculate_export_file_name(policies, mt, multi_msp)
     export_results(results, file_name)
