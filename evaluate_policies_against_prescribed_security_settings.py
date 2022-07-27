@@ -21,41 +21,54 @@ def get_windows_policies():
             windows_policies.append(policy)
     return windows_policies
 
-def evaluate_policies(policies):
+def data_from_more_than_one_msp(policies):
+    policy_msp_ids = []
+    for policy in policies:
+        if policy['msp_id'] not in policy_msp_ids:
+            policy_msp_ids.append(policy['msp_id'])
+    if len(policy_msp_ids) > 1:
+        return True
+    else:
+        return False
+
+def evaluate_policies(policies, multi_msp):
     results = []
     for policy in policies:
         result = {}
-        result['policy_id'] = policy['id']
-        result['policy_name'] = policy['name']
-        result['enable_dcloud_services'] = '-manual_review-'
-        result['detection_level'] = check_policy_setting('MEDIUM', policy['detection_level'])
-        result['prevention_level'] = check_policy_setting('MEDIUM', policy['prevention_level'])
-        result['protection_level_pua'] = check_policy_setting('PREVENT', policy['protection_level_pua'])
-        result['scan_network_drives'] = check_policy_setting('True', policy['scan_network_drives'])
-        result['embedded_dde_object'] = '-manual_review-'
-        result['ransomware_behavior'] = check_policy_setting('PREVENT', policy['ransomware_behavior'])
-        result['in_memory_protection'] = check_policy_setting('True', policy['in_memory_protection'])
-        result['arbitrary_shellcode_execution'] = check_policy_setting('PREVENT', policy['arbitrary_shellcode_execution'])
-        result['remote_code_injection'] = check_policy_setting('PREVENT', policy['remote_code_injection'])
-        result['reflective_dll_loading'] = check_policy_setting('PREVENT', policy['reflective_dll_loading'])
-        result['reflective_dotnet_injection'] = check_policy_setting('PREVENT', policy['reflective_dotnet_injection'])
-        result['amsi_bypass'] = check_policy_setting('PREVENT', policy['amsi_bypass'])
-        result['credentials_dump'] = check_policy_setting('PREVENT', policy['credentials_dump'])
-        result['known_payload_execution'] = check_policy_setting('PREVENT', policy['known_payload_execution'])
-        result['suspicious_script_execution'] = '-manual_review-'
-        result['malicious_powershell_command_execution'] = '-manual_review-'
-        result['suspicious_activity_detection'] = '-manual_review-'
-        result['suspicious_powershell_command_execution'] = '-manual_review-'
-        result['office_macro_script_action'] = check_policy_setting('USE_D_BRAIN', policy['office_macro_script_action'])
-        result['powershell_script_action'] = check_policy_setting('ALLOW', policy['powershell_script_action'])
-        result['html_applications_action'] = check_policy_setting('PREVENT', policy['html_applications_action'])
-        result['prevent_all_activescript_usage'] = check_policy_setting('ALLOW', policy['prevent_all_activescript_usage'])
-        result['activescript_action'] = check_policy_setting('PREVENT', policy['activescript_action'])
+        if multi_msp:
+            result['MSP ID'] = policy['msp_id']
+            result['MSP Name'] = policy['msp_name']
+        result['ID'] = policy['id']
+        result['Name'] = policy['name']
+        result['D-Cloud Reputation Service'] = '-manual_review-'
+        result['Static Analysis PE Detection'] = check_policy_setting('MEDIUM', policy['detection_level'])
+        result['Static Analysis PE Prevention'] = check_policy_setting('MEDIUM', policy['prevention_level'])
+        result['Known PUA'] = check_policy_setting('PREVENT', policy['protection_level_pua'])
+        result['Embedded DDE Objects'] = '-manual_review-'
+        result['Network Drive Protection'] = check_policy_setting('True', policy['scan_network_drives'])
+        result['Macro Execution'] = check_policy_setting('USE_D_BRAIN', policy['office_macro_script_action'])
+        result['Ransomware'] = check_policy_setting('PREVENT', policy['ransomware_behavior'])
+        result['In-Memory Protection'] = check_policy_setting('True', policy['in_memory_protection'])
+        result['Arbitrary Shellcode'] = check_policy_setting('PREVENT', policy['arbitrary_shellcode_execution'])
+        result['Remote Code Injection'] = check_policy_setting('PREVENT', policy['remote_code_injection'])
+        result['Reflective DLL Injection'] = check_policy_setting('PREVENT', policy['reflective_dll_loading'])
+        result['.Net Reflection'] = check_policy_setting('PREVENT', policy['reflective_dotnet_injection'])
+        result['AMSI Bypass'] = check_policy_setting('PREVENT', policy['amsi_bypass'])
+        result['Credential Dumping'] = check_policy_setting('PREVENT', policy['credentials_dump'])
+        result['Known Payload Executionn'] = check_policy_setting('PREVENT', policy['known_payload_execution'])
+        result['Suspicious Script Execution'] = '-manual_review-'
+        result['Malicious PowerShell Commands'] = '-manual_review-'
+        result['Suspicious Activity Detection'] = '-manual_review-'
+        result['Malicious PowerShell Commands'] = '-manual_review-'
+        result['PowerShell'] = check_policy_setting('ALLOW', policy['powershell_script_action'])
+        result['HTML Applications'] = check_policy_setting('PREVENT', policy['html_applications_action'])
+        result['ActiveScript Usage'] = check_policy_setting('ALLOW', policy['prevent_all_activescript_usage'])
+        result['ActiveScript Execution'] = check_policy_setting('PREVENT', policy['activescript_action'])
         results.append(result)
     return results
 
-def calculate_export_file_name(policies):
-    if di.is_server_multitenancy_enabled():
+def calculate_export_file_name(policies, mt, multi_msp):
+    if mt and not multi_msp:
         server_shortname = re.sub(r'[^a-z0-9]','',policies[0]['msp_name'].lower())
     else:
         server_shortname = di.fqdn.split(".",1)[0]
@@ -82,10 +95,12 @@ def add_device_counts(policy_list):
 def main():
     prompt_user_for_config()
     policies = get_windows_policies()
-    results = evaluate_policies(policies)
+    mt = di.is_server_multitenancy_enabled()
+    multi_msp = data_from_more_than_one_msp(policies)
+    results = evaluate_policies(policies, multi_msp)
     if input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [NO]: ').lower() == 'yes':
         results = add_device_counts(results)
-    file_name = calculate_export_file_name(policies)
+    file_name = calculate_export_file_name(policies, mt, multi_msp)
     export_results(results, file_name)
 
 if __name__ == "__main__":
