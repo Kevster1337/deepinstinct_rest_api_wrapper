@@ -11,16 +11,7 @@
 #
 
 import pandas, datetime
-
-# Prompt use for D-Appliance Version, validate input, then import appropriate
-# version of the REST API Wrapper
-di_version = ''
-while di_version not in ['3.0', '2.5']:
-    di_version = input('DI Server Version [3.0 | 2.5]? ')
-if di_version == '3.0':
-    import deepinstinct30 as di
-else:
-    import deepinstinct25 as di
+import deepinstinct30 as di
 
 # Optional hardcoded config - if not provided, you'll be prompted at runtime
 di.fqdn = 'SERVER-NAME.customers.deepinstinctweb.com'
@@ -38,7 +29,7 @@ while di.key == 'API-KEY':
 # --> Leave exactly 1 call to di.get_events uncommented
 
 # All events
-events = di.get_events()
+#events = di.get_events()
 #events = di.get_all_events(max_event_id=9999) #use alternate method to include Script Control events if desired
 
 # Example of how to filter on minimum event_id
@@ -50,13 +41,13 @@ events = di.get_events()
 #     fields which support a range with 'from' (minimum) and 'to' (maximum)
 # --> Reference API documentation (https://fqdn/api/v1) for full list of
 #     available field names and values.
-#search_parameters = {}
+search_parameters = {}
 #search_parameters['status'] = ['OPEN', 'CLOSED']
 #search_parameters['threat_severity'] = ['LOW', 'MODERATE', 'VERY_HIGH']
 #search_parameters['trigger'] = ['BRAIN', 'DDE_USAGE']
 #search_parameters['type'] = ['STATIC_ANALYSIS', 'SCRIPT_CONTROL_COMMAND', 'SCRIPT_CONTROL_PATH', 'RANSOMWARE_FILE_ENCRYPTION', 'SUSPICIOUS_SCRIPT_EXCECUTION', 'MALICIOUS_POWERSHELL_COMMAND_EXECUTION', 'SUSPICIOUS_POWERSHELL_COMMAND_EXECUTION']
 #search_parameters['timestamp'] = {'from': '2021-05-01T15:35:11.333Z', 'to': '2021-05-03T15:35:11.333Z'}
-#search_parameters['insertion_timestamp'] = {'from': '2021-01-16T15:35:11.333Z', 'to': '2021-02-23T15:35:11.333Z'}
+search_parameters['insertion_timestamp'] = {'from': '2021-07-01T00:00:00.000Z', 'to': '2022-08-01T00:00:00.000Z'}
 #search_parameters['last_reoccurence'] = {'from': '2021-01-16T15:35:11.333Z', 'to': '2021-02-23T15:35:11.333Z'}
 #search_parameters['close_timestamp'] = {'from': '2021-01-17T15:35:11.333Z', 'to': '2021-02-17T15:35:11.333Z'}
 #search_parameters['close_trigger'] = ['NONE','BRAIN']
@@ -77,7 +68,7 @@ events = di.get_events()
 #search_parameters['file_status'] = ['UPLOADED', 'NOT_UPLOADED']
 #search_parameters['sandbox_status'] = ['NOT_READY_TO_GENERATE', 'READY_TO_GENERATE']
 #search_parameters['file_size'] = 12345
-#events = di.get_events(search=search_parameters)
+events = di.get_events(search=search_parameters)
 
 # Example of combining search parameters plus minimum event_id
 #TODO: Build search_parameters dictionary based upon example above

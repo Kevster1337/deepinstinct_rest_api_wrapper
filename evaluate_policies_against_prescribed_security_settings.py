@@ -12,6 +12,7 @@ def prompt_user_for_config():
     if di.fqdn == '':
         di.fqdn = 'di-service.customers.deepinstinctweb.com'
     di.key = input('Enter API Key for DI Server: ')
+    return input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [YES]: ').lower() != 'no'
 
 def get_windows_policies():
     all_policies = di.get_policies(include_policy_data=True)
@@ -94,12 +95,12 @@ def add_device_counts(policy_list):
     return policy_list
 
 def main():
-    prompt_user_for_config()
+    include_device_counts = prompt_user_for_config()
     policies = get_windows_policies()
     mt = di.is_server_multitenancy_enabled()
     multi_msp = data_from_more_than_one_msp(policies)
     results = evaluate_policies(policies, multi_msp)
-    if input('Do you want to include device counts in the exported data? Warning: This requires pulling all device data from server. On a large environment it will result in a long runtime. Enter YES or NO, or press enter to accept the default [YES]: ').lower() != 'no':
+    if include_device_counts:
         results = add_device_counts(results)
     file_name = calculate_export_file_name(policies, mt, multi_msp)
     export_results(results, file_name)
