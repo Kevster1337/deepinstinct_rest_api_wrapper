@@ -45,19 +45,11 @@ def get_event_ids_based_on_live_data():
 
     filtered_events = []
     for event in all_events:
-
+``
     # !!! TODO !!! - Modify code  below to set search parameters(s) for events to modify
     # --------------------------------------------------------------------------
-        if event['status'] in ['OPEN']:
-            if event['recorded_device_info']['hostname'] in ['HOSTNAME01']:
-                if event['type'] == ['REFLECTIVE_DOTNET']:
-                    if event['path'] in ['C:\\Program Files (x86)\\Microsoft SQL Server\\100\\DTS\\Binn\\DTExec.exe']:
-                        filtered_events.append(event)
-            if event['type'] == ['AMSI_BYPASS']:
-                if event['path'] in ['C:\\Program Files (x86)\\Microsoft SQL Server\\100\\DTS\\Binn\\SQLPS.exe']:
-                    filtered_events.append(event)
-        if event['type'] == ['STATIC_ANALYSIS']:
-            if event['path'] in ['C:\\Users\\user\\Desktop\\PANDAFREEAV - Copy.exe']:
+        if event['recorded_device_info']['hostname'] in ['ICL-MVMVAP-VM01']:
+            if event['type'] == 'REMOTE_CODE_INJECTION_EXECUTION':
                 filtered_events.append(event)
     # --------------------------------------------------------------------------
 
@@ -86,9 +78,9 @@ def get_event_ids_from_file(file_name):
 
 def main():
 
-    di.fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [di-service.customers.deepinstinctweb.com]: ')
+    di.fqdn = input('Enter FQDN of DI Server, or press enter to accept the default [citigroup.customers.deepinstinctweb.com]: ')
     if di.fqdn == '':
-        di.fqdn = 'di-service.customers.deepinstinctweb.com'
+        di.fqdn = 'citigroup.customers.deepinstinctweb.com'
 
     di.key = input('Enter API Key for DI Server: ')
 

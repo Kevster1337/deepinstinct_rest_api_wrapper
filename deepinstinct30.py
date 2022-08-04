@@ -2,7 +2,7 @@
 # Patrick Van Zandt, Principal Professional Services Engineer, Deep Instinct
 #
 # Compatibility:
-# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, 3.2.x, and 3.3.x
+# -Deep Instinct D-Appliance versions 3.0.x, 3.1.x, 3.2.x, 3.3.x, and 3.4.x
 # -Written and tested using a Python 3.8.3 instance installed by Anaconda
 #
 # Suggested Usage:
@@ -26,9 +26,10 @@
 #
 
 debug_mode = False
+quiet_mode = False
 
 # Import various libraries used by one or more method below.
-import requests, json, datetime, pandas, re, ipaddress, time, os
+import requests, json, datetime, pandas, re, ipaddress, time, os, hashlib
 #If any of the above throw import errors, try running 'pip install library_name'
 #If that doesn't fix the problem I recommend to search Google for the error
 #that you are getting.
@@ -284,7 +285,8 @@ def get_devices(include_deactivated=True):
                 last_id = response['last_id'] #save returned last_id for reuse on next request
             else: #added this to handle issue where some server versions fail to return last_id on final batch of devices
                 last_id = None
-            print(request_url, 'returned 200 with last_id', last_id, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned 200 with last_id', last_id, end='\r')
             if 'devices' in response:
                 devices = response['devices'] #extract devices from response
                 for device in devices: #iterate through the list of devices
@@ -295,7 +297,8 @@ def get_devices(include_deactivated=True):
             'on request to\n', request_url, '\nwith headers\n', headers)
             error_count += 1  #increment error counter
             time.sleep(10) #wait before trying request again
-    print('\n')
+    if not quiet_mode:
+        print('\n')
 
     # When while loop exists, we know we have collected all visible data
 
@@ -303,8 +306,7 @@ def get_devices(include_deactivated=True):
     return collected_devices
 
 
-# Translates a list of device names, regex patterns, or CIDRs to a list of
-# device IDs
+# Translates a list of device names, regex patterns, or CIDRs to a list of device IDs
 def get_device_ids(search_list, regex_hostname_search=False, cidr_search=False):
     # GET ALL DEVICES
     devices = get_devices(include_deactivated=False)
@@ -410,7 +412,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
             policy_id = policy['id']
             request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
             response = requests.get(request_url, headers=headers)
-            print(request_url, 'returned', response.status_code, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned', response.status_code, end='\r')
             # Check response code (for some platforms, no policy data available)
             if response.status_code == 200:
                 # Extract policy data from response and append it to policy
@@ -419,7 +422,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
                 else:
                     policy_data = response.json()['data']
                 policy.update(policy_data)
-        print('\n')
+        if not quiet_mode:
+            print('\n')
 
     # APPEND ALLOW-LIST, DENY-LIST, AND EXCLUSION DATA (IF ENABLED)
     if include_allow_deny_lists:
@@ -453,7 +457,8 @@ def get_policies(include_policy_data=False, include_allow_deny_lists=False, keep
                 if response.status_code == 200:
                     response = response.json()
                     policy['allow_deny_and_exclusion_lists'][list_type] = response
-        print('\n')
+        if not quiet_mode:
+            print('\n')
 
     # RETURN THE COLLECTED DATA
     return policies
@@ -578,6 +583,21 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
         try:
             #make request to server, store response
             response = requests.post(request_url, headers=headers, json=search, timeout=30)
+            if response.status_code == 200:
+                #store the returned last_id value
+                minimum_event_id = response.json()['last_id']
+
+                #print result to console
+                if not quiet_mode:
+                    print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
+
+                #if we got a none-null last_id back
+                if minimum_event_id != None:
+                    #then extract the events
+                    events = response.json()['events']
+                    #append the event(s) from this response to collected_events
+                    for event in events:
+                        collected_events.append(event)
         except requests.exceptions.RequestException:
             print('WARNING: Exception on', request_url, '. Will sleep for 10 seconds and try again.')
             time.sleep(10)
@@ -587,7 +607,8 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
             minimum_event_id = response.json()['last_id']
 
             #print result to console
-            print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
+            if not quiet_mode:
+                print(request_url, 'returned', response.status_code, 'with last_id', minimum_event_id, end='\r')
 
             #if we got a none-null last_id back
             if minimum_event_id != None:
@@ -596,7 +617,8 @@ def get_events(search={}, minimum_event_id=0, suspicious=False):
                 #append the event(s) from this response to collected_events
                 for event in events:
                     collected_events.append(event)
-    print('\n')
+    if not quiet_mode:
+        print('\n')
 
     #return the list of collected events
     return collected_events
@@ -646,14 +668,7 @@ def get_device(device_id):
         return None
 
 #hides a list of event ids from the GUI and REST API
-def archive_events (event_id_list, unarchive=False, suspicious=False, input_is_ids_only=True):
-
-    # if full events were provided, strip out just the ids before proceeding
-    if not input_is_ids_only:
-        event_ids = []
-        for event in event_id_list:
-            event_ids.append(event['id'])
-        event_id_list = event_ids
+def archive_events (event_id_list, unarchive=False, suspicious=False):
 
     # set headers (same for all requests in this method)
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': key}
@@ -679,18 +694,18 @@ def archive_events (event_id_list, unarchive=False, suspicious=False, input_is_i
 
 
 #hides a list of suspicious event ids from the GUI and REST API
-def archive_suspicious_events(event_id_list, unarchive=False, input_is_ids_only=True):
+def archive_suspicious_events(event_id_list, unarchive=False):
     return archive_events(event_id_list=event_id_list, suspicious=True)
 
 
 #unhides a list of event ids from the GUI and REST API
-def unarchive_events(event_id_list, suspicious=False, input_is_ids_only=True):
-    return archive_events(event_id_list=event_id_list, unarchive=True, suspicious=suspicious, input_is_ids_only=input_is_ids_only)
+def unarchive_events(event_id_list, suspicious=False):
+    return archive_events(event_id_list=event_id_list, unarchive=True, suspicious=suspicious)
 
 
 #unhides a list of suspicious event ids from the GUI and REST API
-def unarchive_suspicious_events(event_id_list, input_is_ids_only=True):
-    return unarchive_events(event_id_list=event_id_list, suspicious=True, input_is_ids_only=input_is_ids_only)
+def unarchive_suspicious_events(event_id_list):
+    return unarchive_events(event_id_list=event_id_list, suspicious=True)
 
 
 #allows organization of exported data by server-specific folders
@@ -1474,3 +1489,143 @@ def change_user_role(username, new_role='READ_ONLY'):
                 print('ERROR: Unexpected return code', response.status_code, 'on PUT', request_url, 'with headers', headers, 'and payload', payload)
             return None
     print('ERROR: No user found with provided username', username)
+
+def set_uninstall_password(policy_id, new_password):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.get(request_url, headers=headers)
+    policy_data = response.json()
+    policy_data['data']['uninstall_password_hash'] = hashlib.sha256(new_password.encode('utf-16-le')).hexdigest()
+    response = requests.put(request_url, json=policy_data, headers=headers)
+
+def set_disable_password(policy_id, new_password):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/data'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.get(request_url, headers=headers)
+    policy_data = response.json()
+    policy_data['data']['disable_password_hash'] = hashlib.sha256(new_password.encode('utf-16-le')).hexdigest()
+    response = requests.put(request_url, json=policy_data, headers=headers)
+
+def get_behavioral_allow_lists(policy_id):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    behavioral_allow_lists = []
+    response = requests.get(request_url, headers=headers)
+    if response.status_code == 200:
+        items = response.json()['items']
+        for item in items:
+            behavioral_allow_list = {'process': item['item'], 'behavior_name_list': [], 'comment': item['comment']}
+            if 1 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('RANSOMWARE_FILE_ENCRYPTION')
+            if 2 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REMOTE_CODE_INJECTION_EXECUTION')
+            if 3 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('KNOWN_SHELLCODE_PAYLOADS')
+            if 4 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('ARBITRARY_SHELLCODE_EXECUTION')
+            if 5 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REFLECTIVE_DLL')
+            if 6 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('REFLECTIVE_DOTNET')
+            if 7 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('AMSI_BYPASS')
+            if 8 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('DIRECT_SYSTEMCALLS')
+            if 9 in item['behavior_ids']:
+                behavioral_allow_list['behavior_name_list'].append('CREDENTIALS_DUMP')
+            behavioral_allow_lists.append(behavioral_allow_list)
+    return behavioral_allow_lists
+
+def add_behavioral_allow_lists(policy_id, process_list, behavior_name_list, comment):
+    behavior_id_list = []
+    if 'RANSOMWARE_FILE_ENCRYPTION' in behavior_name_list:
+        behavior_id_list.append(1)
+    if 'REMOTE_CODE_INJECTION_EXECUTION' in behavior_name_list:
+        behavior_id_list.append(2)
+    if 'KNOWN_SHELLCODE_PAYLOADS' in behavior_name_list:
+        behavior_id_list.append(3)
+    if 'ARBITRARY_SHELLCODE_EXECUTION' in behavior_name_list:
+        behavior_id_list.append(4)
+    if 'REFLECTIVE_DLL' in behavior_name_list:
+        behavior_id_list.append(5)
+    if 'REFLECTIVE_DOTNET' in behavior_name_list:
+        behavior_id_list.append(6)
+    if 'AMSI_BYPASS' in behavior_name_list:
+        behavior_id_list.append(7)
+    if 'DIRECT_SYSTEMCALLS' in behavior_name_list:
+        behavior_id_list.append(8)
+    if 'CREDENTIALS_DUMP' in behavior_name_list:
+        behavior_id_list.append(9)
+
+    allow_lists_to_add = []
+    for process in process_list:
+        allow_list_item = {'item': process, 'behavior_ids': behavior_id_list, 'comment': comment}
+        allow_lists_to_add.append(allow_list_item)
+    payload = {'items': allow_lists_to_add}
+
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.post(request_url, headers=headers, json=payload)
+
+    if response.status_code == 204:
+        print('Successfully added', len(process_list), 'entries to the', behavior_name_list, 'allow lists for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload \n', json.dumps(payload, indent=4), '\n and headers \n', json.dumps(headers, indent=4))
+        return False
+
+def remove_behavioral_allow_lists(policy_id, process_list):
+    payload = {'items': []}
+    for process in process_list:
+        payload['items'].append({'item': process})
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/process_paths'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    response = requests.delete(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully removed', len(process_list), 'entries from the Behavioral Allow List for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on DELETE', request_url, 'with payload \n', json.dumps(payload, indent=4), '\n and headers \n', json.dumps(headers, indent=4))
+        return False
+
+def remove_all_behavioral_allow_lists(policy_id):
+    items = get_behavioral_allow_lists(policy_id)
+    process_list = []
+    for item in items:
+        process_list.append(item['process'])
+    remove_behavioral_allow_lists(policy_id=policy_id, process_list=process_list)
+
+def add_script_path_allow_list(policy_id, path, comment=''):
+    request_url = f'https://{fqdn}/api/v1/policies/{policy_id}/allow-list/scripts'
+    headers = {'accept': 'application/json', 'Authorization': key}
+    payload = {'items': [ {'comment': comment, 'item': path} ] }
+    response = requests.post(request_url, headers=headers, json=payload)
+    if response.status_code == 204:
+        print('Successfully added', path, 'to script path allow list for policy', policy_id)
+        return True
+    else:
+        print('ERROR: Unexpected response', response.status_code, 'on POST to', request_url, 'with payload', payload)
+        return False
+
+def get_audit_log():
+    page_size = 100
+    offset = 0
+    collected_data = []
+    headers = {'accept': 'application/json', 'Authorization': key}
+    while True:
+        request_url = f'https://{fqdn}/api/v1/audit_logs/?size={page_size}&offset={offset}'
+        response = requests.get(request_url, headers=headers)
+        #print(request_url, 'returned', response.status_code)
+        if response.status_code == 200:
+            audit_log_entries = response.json()
+            #print('The above request returned', len(audit_log_entries), 'entries.')
+            if len(audit_log_entries) > 0:
+                for item in audit_log_entries:
+                    collected_data.append(item)
+                    offset += 1
+            else:
+                break
+        else:
+            print('ERROR: Unexpected response code', response.status_code, 'on GET', request_url, 'with headers', headers)
+            time.sleep(10)
+    return collected_data

@@ -122,7 +122,8 @@ while True:
             if event['id'] > max_event_processed_previously:
                 max_event_processed_previously = event['id']
 
-    print('max_event_processed_previously is now', max_event_processed_previously)
-    save_config(max_event_processed_previously)
+        print('max_event_processed_previously is now', max_event_processed_previously)
+        save_config(max_event_processed_previously)
+        
     print('Sleeping for', sleep_time_in_seconds, 'seconds')
     time.sleep(sleep_time_in_seconds)
